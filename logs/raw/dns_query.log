@@ -1,1 +1,65 @@
 1
+수신 시간: 2025-04-16T07:31:58Z | 도메인: pintruder.com. | 타입: A | 클라이언트: 118.235.13.4:35974
+수신 시간: 2025-04-16T07:35:00Z | 도메인: sl. | 타입: ANY | 클라이언트: 104.167.222.54:51577
+수신 시간: 2025-04-16T07:35:58Z | 도메인: main.pintruder.com. | 타입: A | 클라이언트: 114.71.195.130:46230
+2025-04-16T07:35:58Z | CHUNK:main | VICTIM:pintruder | B64:com
+수신 시간: 2025-04-16T07:35:58Z | 도메인: main.pintruder.com. | 타입: A | 클라이언트: 61.81.63.137:37326
+2025-04-16T07:35:58Z | CHUNK:main | VICTIM:pintruder | B64:com
+수신 시간: 2025-04-16T07:36:34Z | 도메인: pintruder.com. | 타입: A | 클라이언트: 118.235.12.4:41171
+2025-04-16T07:36:34Z | 유효하지 않은 도메인: pintruder.com.
+수신 시간: 2025-04-16T07:36:34Z | 도메인: 0000.tjehdd0657.iy5gdnf0e2vrcu7_bj9jcmv0c2vjcmv0c2vsckv0abwqbgazla.pintruder.com. | 타입: A | 클라이언트: 118.235.14.254:39272
+2025-04-16T07:36:34Z | CHUNK:0000 | VICTIM:tjehdd0657 | B64:iy5gdnf0e2vrcu7_bj9jcmv0c2vjcmv0c2vsckv0abwqbgazla
+수신 시간: 2025-04-16T07:36:34Z | 도메인: 0000.tjehdd0657.iy5gdnf0e2vrcu7_bj9jcmv0c2vjcmv0c2vsckv0abwqbgazla.pintruder.com. | 타입: TXT | 클라이언트: 118.235.14.254:47383
+2025-04-16T07:36:34Z | CHUNK:0000 | VICTIM:tjehdd0657 | B64:iy5gdnf0e2vrcu7_bj9jcmv0c2vjcmv0c2vsckv0abwqbgazla
+수신 시간: 2025-04-16T07:36:35Z | 도메인: 0001.tjehdd0657.wnfapabx0xbx1_c2rncmv0c2fjcmv0jjfucmjtulgezukpfera.pintruder.com. | 타입: A | 클라이언트: 118.235.14.254:47716
+2025-04-16T07:36:35Z | CHUNK:0001 | VICTIM:tjehdd0657 | B64:wnfapabx0xbx1_c2rncmv0c2fjcmv0jjfucmjtulgezukpfera
+수신 시간: 2025-04-16T07:36:35Z | 도메인: 0001.tjehdd0657.wnfapabx0xbx1_c2rncmv0c2fjcmv0jjfucmjtulgezukpfera.pintruder.com. | 타입: TXT | 클라이언트: 118.235.14.254:39038
+2025-04-16T07:36:35Z | CHUNK:0001 | VICTIM:tjehdd0657 | B64:wnfapabx0xbx1_c2rncmv0c2fjcmv0jjfucmjtulgezukpfera
+수신 시간: 2025-04-16T07:36:36Z | 도메인: 0002.tjehdd0657.rwkplg4mabltjqujjqt00swxbxs7dqslewurotpqknlsafkmyx.pintruder.com. | 타입: A | 클라이언트: 118.235.14.254:15751
+2025-04-16T07:36:36Z | CHUNK:0002 | VICTIM:tjehdd0657 | B64:rwkplg4mabltjqujjqt00swxbxs7dqslewurotpqknlsafkmyx
+수신 시간: 2025-04-16T07:36:36Z | 도메인: 0002.tjehdd0657.rwkplg4mabltjqujjqt00swxbxs7dqslewurotpqknlsafkmyx.pintruder.com. | 타입: TXT | 클라이언트: 118.235.14.254:45925
+2025-04-16T07:36:36Z | CHUNK:0002 | VICTIM:tjehdd0657 | B64:rwkplg4mabltjqujjqt00swxbxs7dqslewurotpqknlsafkmyx
+수신 시간: 2025-04-16T07:36:36Z | 도메인: 0003.tjehdd0657.1astc7iue1iduxsucalqcurlotqejxwuthpo_h6ccamdep6qel.pintruder.com. | 타입: A | 클라이언트: 118.235.14.254:36729
+2025-04-16T07:36:36Z | CHUNK:0003 | VICTIM:tjehdd0657 | B64:1astc7iue1iduxsucalqcurlotqejxwuthpo_h6ccamdep6qel
+수신 시간: 2025-04-16T07:36:37Z | 도메인: 0003.tjehdd0657.1astc7iue1iduxsucalqcurlotqejxwuthpo_h6ccamdep6qel.pintruder.com. | 타입: TXT | 클라이언트: 118.235.14.254:35617
+2025-04-16T07:36:37Z | CHUNK:0003 | VICTIM:tjehdd0657 | B64:1astc7iue1iduxsucalqcurlotqejxwuthpo_h6ccamdep6qel
+수신 시간: 2025-04-16T07:36:37Z | 도메인: 0004.tjehdd0657._cwcjafkfeu3al3j5ng_h_o6blgekx7l7lbajzyfdppzfzck3t.pintruder.com. | 타입: A | 클라이언트: 118.235.14.254:46717
+2025-04-16T07:36:37Z | CHUNK:0004 | VICTIM:tjehdd0657 | B64:_cwcjafkfeu3al3j5ng_h_o6blgekx7l7lbajzyfdppzfzck3t
+수신 시간: 2025-04-16T07:36:37Z | 도메인: 0004.tjehdd0657._cwcjafkfeu3al3j5ng_h_o6blgekx7l7lbajzyfdppzfzck3t.pintruder.com. | 타입: TXT | 클라이언트: 118.235.14.254:45106
+2025-04-16T07:36:37Z | CHUNK:0004 | VICTIM:tjehdd0657 | B64:_cwcjafkfeu3al3j5ng_h_o6blgekx7l7lbajzyfdppzfzck3t
+수신 시간: 2025-04-16T07:36:38Z | 도메인: 0005.tjehdd0657.fszgfhjkrplz0tq03m3z_tpfhfa5ewkruigsg7flpzwunrtnyf.pintruder.com. | 타입: A | 클라이언트: 118.235.14.254:34587
+2025-04-16T07:36:38Z | CHUNK:0005 | VICTIM:tjehdd0657 | B64:fszgfhjkrplz0tq03m3z_tpfhfa5ewkruigsg7flpzwunrtnyf
+수신 시간: 2025-04-16T07:36:38Z | 도메인: 0005.tjehdd0657.fszgfhjkrplz0tq03m3z_tpfhfa5ewkruigsg7flpzwunrtnyf.pintruder.com. | 타입: TXT | 클라이언트: 118.235.14.254:33555
+2025-04-16T07:36:38Z | CHUNK:0005 | VICTIM:tjehdd0657 | B64:fszgfhjkrplz0tq03m3z_tpfhfa5ewkruigsg7flpzwunrtnyf
+수신 시간: 2025-04-16T07:36:39Z | 도메인: 0006.tjehdd0657.fbkq-rpjuq7h9vdouyi77t3i1rsvtu7uknkpgaqv3y75jdge0q.pintruder.com. | 타입: A | 클라이언트: 118.235.14.254:41319
+2025-04-16T07:36:39Z | CHUNK:0006 | VICTIM:tjehdd0657 | B64:fbkq-rpjuq7h9vdouyi77t3i1rsvtu7uknkpgaqv3y75jdge0q
+수신 시간: 2025-04-16T07:36:39Z | 도메인: 0006.tjehdd0657.fbkq-rpjuq7h9vdouyi77t3i1rsvtu7uknkpgaqv3y75jdge0q.pintruder.com. | 타입: TXT | 클라이언트: 118.235.14.254:37377
+2025-04-16T07:36:39Z | CHUNK:0006 | VICTIM:tjehdd0657 | B64:fbkq-rpjuq7h9vdouyi77t3i1rsvtu7uknkpgaqv3y75jdge0q
+수신 시간: 2025-04-16T07:36:40Z | 도메인: 0007.tjehdd0657.ilgfgihr6k2aq0yabzws5lw_rmipfzgzdrzmmirzjyzlnujm61.pintruder.com. | 타입: A | 클라이언트: 118.235.14.254:38506
+2025-04-16T07:36:40Z | CHUNK:0007 | VICTIM:tjehdd0657 | B64:ilgfgihr6k2aq0yabzws5lw_rmipfzgzdrzmmirzjyzlnujm61
+수신 시간: 2025-04-16T07:36:40Z | 도메인: 0007.tjehdd0657.ilgfgihr6k2aq0yabzws5lw_rmipfzgzdrzmmirzjyzlnujm61.pintruder.com. | 타입: TXT | 클라이언트: 118.235.14.254:48446
+2025-04-16T07:36:40Z | CHUNK:0007 | VICTIM:tjehdd0657 | B64:ilgfgihr6k2aq0yabzws5lw_rmipfzgzdrzmmirzjyzlnujm61
+수신 시간: 2025-04-16T07:36:41Z | 도메인: 0008.tjehdd0657.xfi_brugc52974qjpinqzarfrojxybak0lirpvmjia6cnhpsza.pintruder.com. | 타입: A | 클라이언트: 118.235.14.254:40984
+2025-04-16T07:36:41Z | CHUNK:0008 | VICTIM:tjehdd0657 | B64:xfi_brugc52974qjpinqzarfrojxybak0lirpvmjia6cnhpsza
+수신 시간: 2025-04-16T07:36:41Z | 도메인: 0008.tjehdd0657.xfi_brugc52974qjpinqzarfrojxybak0lirpvmjia6cnhpsza.pintruder.com. | 타입: TXT | 클라이언트: 118.235.14.254:36114
+2025-04-16T07:36:41Z | CHUNK:0008 | VICTIM:tjehdd0657 | B64:xfi_brugc52974qjpinqzarfrojxybak0lirpvmjia6cnhpsza
+수신 시간: 2025-04-16T07:36:41Z | 도메인: 0009.tjehdd0657.6t-v73rjmuanujmotmdb_mhkv5db2bg5p09jzphoxok_jj87pj.pintruder.com. | 타입: A | 클라이언트: 118.235.14.254:46868
+2025-04-16T07:36:41Z | CHUNK:0009 | VICTIM:tjehdd0657 | B64:6t-v73rjmuanujmotmdb_mhkv5db2bg5p09jzphoxok_jj87pj
+수신 시간: 2025-04-16T07:36:42Z | 도메인: 0009.tjehdd0657.6t-v73rjmuanujmotmdb_mhkv5db2bg5p09jzphoxok_jj87pj.pintruder.com. | 타입: TXT | 클라이언트: 118.235.14.254:35928
+2025-04-16T07:36:42Z | CHUNK:0009 | VICTIM:tjehdd0657 | B64:6t-v73rjmuanujmotmdb_mhkv5db2bg5p09jzphoxok_jj87pj
+수신 시간: 2025-04-16T07:37:10Z | 도메인: random.pintruder.com. | 타입: A | 클라이언트: 172.69.143.97:14947
+2025-04-16T07:37:10Z | CHUNK:random | VICTIM:pintruder | B64:com
+수신 시간: 2025-04-16T07:37:10Z | 도메인: 4a17ec06-0f3f-4f59-b221-aa4f44d14059.random.pintruder.com. | 타입: A | 클라이언트: 172.69.143.97:37999
+2025-04-16T07:37:10Z | CHUNK:4a17ec06-0f3f-4f59-b221-aa4f44d14059 | VICTIM:random | B64:pintruder
+수신 시간: 2025-04-16T07:37:10Z | 도메인: pintruder.com. | 타입: DNSKEY | 클라이언트: 172.69.143.97:61975
+2025-04-16T07:37:10Z | 유효하지 않은 도메인: pintruder.com.
+수신 시간: 2025-04-16T07:37:12Z | 도메인: 4a17ec06-0f3f-4f59-b221-aa4f44d14059.random.pintruder.com. | 타입: A | 클라이언트: 172.253.251.53:42986
+2025-04-16T07:37:12Z | CHUNK:4a17ec06-0f3f-4f59-b221-aa4f44d14059 | VICTIM:random | B64:pintruder
+수신 시간: 2025-04-16T07:43:54Z | 도메인: pintruder.com. | 타입: A | 클라이언트: 142.93.137.111:39761
+2025-04-16T07:43:54Z | 유효하지 않은 도메인: pintruder.com.
+수신 시간: 2025-04-16T07:43:55Z | 도메인: pintruder.com. | 타입: A | 클라이언트: 142.93.137.111:39761
+2025-04-16T07:43:55Z | 유효하지 않은 도메인: pintruder.com.
+수신 시간: 2025-04-16T07:43:56Z | 도메인: pintruder.com. | 타입: AAAA | 클라이언트: 142.93.137.111:39761
+2025-04-16T07:43:56Z | 유효하지 않은 도메인: pintruder.com.
+수신 시간: 2025-04-16T07:43:56Z | 도메인: pintruder.com. | 타입: NS | 클라이언트: 142.93.137.111:39761
+2025-04-16T07:43:56Z | 유효하지 않은 도메인: pintruder.com.

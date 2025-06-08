@@ -1,0 +1,18 @@
+# 생성된 로그 및 데이터 파일 무시
+logs/
+analyzer/restored_zips/
+analyzer/analyzer.log
+server/command_queue.json
+server/victim_metadata.json
+server/exfil_sessions.json
+
+# 컴파일된 바이너리 무시
+dnsd/dns-c2-server
+
+# 파이썬 가상환경 및 캐시 파일 무시
+venv/
+__pycache__/
+*.pyc
+
+# 클라이언트가 생성하는 파일 무시
+*.dat

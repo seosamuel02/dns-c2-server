@@ -33,7 +33,7 @@
             border-color: #454d55; 
             color: #00beef; /* 테이블 헤더 텍스트 */
         }
-        .btn-danger .fas { /* 삭제 버튼 내 아이콘 색상 */
+        .btn-danger .fas, .btn-info .fas, .btn-secondary .fas {
             color: white;
         }
         .table tbody td { 
@@ -61,6 +61,8 @@
         .btn-info { background-color: #17a2b8; border-color: #17a2b8; }
         .btn-secondary { background-color: #6c757d; border-color: #6c757d; }
         .btn-danger { background-color: #dc3545; border-color: #dc3545; }
+        .btn-outline-light { color: #f8f9fa; border-color: #f8f9fa80; }
+        .btn-outline-light:hover { background-color: #f8f9fa; color: #2c3034; }
         
         .results-link { color: #00beef; }
         pre { 
@@ -71,6 +73,8 @@
             border-radius: 0.25rem;
             max-height: 150px; /* 최대 높이 제한 */
             overflow-y: auto; /* 스크롤 추가 */
+            white-space: pre-wrap;
+            word-break: break-all;
         }
         .status-dot { 
             height: 12px; 
@@ -91,9 +95,8 @@
         .action-buttons form { display: inline-block; margin-left: 5px; }
         .action-buttons .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.875rem; }
 
-        /* 추가: datalist 스타일 (일부 브라우저 제한적) */
-        datalist { /* 기본적으로 보이지 않음 */ }
-        input[list]::-webkit-calendar-picker-indicator { /* Chrome, Edge 등 */
+        datalist { }
+        input[list]::-webkit-calendar-picker-indicator {
             opacity: 0.5;
             cursor: pointer;
         }
@@ -102,8 +105,9 @@
 <body>
     <div class="container-fluid">
         <div class="card shadow-sm">
-            <div class="card-header">
+            <div class="card-header d-flex justify-content-between align-items-center">
                 <h1 class="mb-0"><i class="fas fa-shield-alt mr-2"></i>DNS C2 Dashboard</h1>
+                <a href="{{ url_for('logout') }}" class="btn btn-outline-light btn-sm"><i class="fas fa-sign-out-alt mr-1"></i>Logout</a>
             </div>
         </div>
 
@@ -175,19 +179,19 @@
                                 {% if delivered_dns_time %}
                                     <span title="Via DNS"><i class="fas fa-network-wired mr-1"></i>DNS: {{ delivered_dns_time.replace('T', ' ')[:19] }}</span>
                                 {% elif delivered_http_time %}
-                                    <span title="Via HTTP API"><i class="fas fa-globe mr-1"></i>HTTP: {{ delivered_http_time.replace('T', ' ')[:19] }}</span>
+                                    <span title="Via HTTP API"><i class="fas fa-globe mr-1"></i>HTTPS: {{ delivered_http_time.replace('T', ' ')[:19] }}</span>
                                 {% else %}
                                     -
                                 {% endif %}
                             </td>
-                        <td class="action-buttons">
-                            <a class="btn btn-info btn-sm" href="{{ url_for('view_command_result_page', command_id=cmd.get('command_id'), victim_hash=cmd.get('victim_hash')) }}" title="View Result"><i class="fas fa-eye"></i> Result</a>
-                            <form action="{{ url_for('delete_command', command_id=cmd.get('command_id')) }}" method="post" style="display:inline;">
-                                <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete command {{ cmd.get('command_id')[:8] }}...?');" title="Delete Command">
-                                    <i class="fas fa-trash-alt"></i> Delete
-                                </button>
-                            </form>
-                        </td>
+                            <td class="action-buttons">
+                                <a class="btn btn-info btn-sm" href="{{ url_for('view_command_result_page', command_id=cmd.get('command_id'), victim_hash=cmd.get('victim_hash')) }}" title="View Result"><i class="fas fa-eye"></i> Result</a>
+                                <form action="{{ url_for('delete_command', command_id=cmd.get('command_id')) }}" method="post" style="display:inline;">
+                                    <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete command {{ cmd.get('command_id')[:8] }}...?');" title="Delete Command">
+                                        <i class="fas fa-trash-alt"></i> Delete
+                                    </button>
+                                </form>
+                            </td>
                         </tr>
                         {% endfor %}
                         </tbody>
@@ -233,20 +237,20 @@
                             <td>{{ victim.get('first_seen', 'Unknown') }}</td>
                             <td>{{ victim.get('last_seen', 'Never') }}</td>
                             <td class="action-buttons">
-                            <a class="btn btn-secondary btn-sm" href="{{ url_for('view_victim_details', victim_hash=victim.id) }}"><i class="fas fa-info-circle mr-1"></i>Details</a>
-                            <form action="{{ url_for('delete_victim', victim_hash=victim.id) }}" method="post" style="display:inline;">
-                                <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete victim {{ victim.id }} and all associated data? This cannot be undone!');" title="Delete Victim">
-                                    <i class="fas fa-user-slash"></i> Delete
-                                </button>
-                            </form>
-                        </td>
+                                <a class="btn btn-secondary btn-sm" href="{{ url_for('view_victim_details', victim_hash=victim.id) }}"><i class="fas fa-info-circle mr-1"></i> Details</a>
+                                <form action="{{ url_for('delete_victim', victim_hash=victim.id) }}" method="post" style="display:inline;">
+                                    <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete victim {{ victim.id }} and all associated data? This cannot be undone!');" title="Delete Victim">
+                                        <i class="fas fa-user-slash"></i> Delete
+                                    </button>
+                                </form>
+                            </td>
                         </tr>
                         {% endfor %}
                         </tbody>
                     </table>
                 </div>
                 {% else %}
-                <p class="text-muted">No victims seen yet. Ensure clients are connecting or check results directory: {{ RESULTS_DIR }}.</p>
+                <p class="text-muted">No victims seen yet. Ensure clients are connecting or check results directory.</p>
                 {% endif %}
             </div>
         </div>

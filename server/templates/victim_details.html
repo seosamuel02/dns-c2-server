@@ -157,29 +157,43 @@
                 </div>
             </div>
 
-            <div class="col-lg-6 mb-4">
-                <div class="card shadow-sm">
+            <div class="col-lg-6 mb-4 d-flex flex-column">
+                <div class="card shadow-sm flex-grow-1">
                     <div class="card-body">
-                        <h2 class="card-title h4"><i class="fas fa-archive mr-2"></i>Exfiltrated File Sessions ({{ sessions_info | length }})</h2>
-                        {% if sessions_info %}
-                        <div class="list-group">
-                            {% for sess in sessions_info %}
+                        <h2 class="card-title h4"><i class="fas fa-network-wired mr-2"></i>DNS C2 Sessions ({{ dns_sessions | length }})</h2>
+                        {% if dns_sessions %}
+                        <div class="list-group mb-3">
+                            {% for sess in dns_sessions %}
                             <div class="list-group-item d-flex justify-content-between align-items-center mb-2">
                                 <h5 class="mb-0 h6">{{ sess.name }}</h5>
                                 <div>
-                                    {% if sess.has_exfil %}
-                                        <a href="{{ url_for('download_restored_exfil_file', victim_hash=victim_hash, session_name=sess.name) }}" class="btn btn-sm btn-success">
-                                            <i class="fas fa-file-download mr-1"></i>Download ZIP
-                                        </a>
-                                    {% else %}
-                                        <span class="text-muted font-italic">No exfiltrated file for this session</span>
-                                    {% endif %}
+                                    <a href="{{ url_for('download_restored_exfil_file', victim_hash=victim_hash, session_name=sess.name) }}" class="btn btn-sm btn-success">
+                                        <i class="fas fa-file-download mr-1"></i>Download ZIP
+                                    </a>
                                 </div>
                             </div>
                             {% endfor %}
                         </div>
                         {% else %}
-                        <p class="text-muted">No session data found for this victim.</p>
+                        <p class="text-muted mb-4">No DNS session data found for this victim.</p>
+                        {% endif %}
+
+                        <hr> <h2 class="card-title h4 mt-4"><i class="fas fa-file-archive mr-2"></i>HTTP Exfiltrated Files ({{ http_exfil_files | length }})</h2>
+                        {% if http_exfil_files %}
+                        <div class="list-group">
+                            {% for file in http_exfil_files %}
+                            <div class="list-group-item d-flex justify-content-between align-items-center mb-2">
+                                <h5 class="mb-0 h6" title="{{ file.filename }}"><i class="fas fa-file-zip mr-2"></i>{{ file.display_name }}</h5>
+                                <div>
+                                    <a href="{{ url_for('download_http_exfil_file', victim_hash=victim_hash, filename=file.filename) }}" class="btn btn-sm btn-success">
+                                        <i class="fas fa-file-download mr-1"></i>Download ZIP
+                                    </a>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <p class="text-muted">No files exfiltrated via HTTP.</p>
                         {% endif %}
                     </div>
                 </div>

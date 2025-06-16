@@ -30,18 +30,18 @@
         .btn-outline-light:hover { background-color: #f8f9fa; color: #2c3034; }
         h1, h2, h3 { color: #00beef; }
         hr { 
-            border-top: 1px solid #454d55; /* hr 색상 조정 */
+            border-top: 1px solid #454d55;
         }
         pre { 
             background-color: #222528; 
             color: #f8f9fa; 
             border: 1px solid #454d55; 
-            padding: 15px; /* 패딩 증가 */
+            padding: 15px;
             border-radius: 0.25rem;
-            white-space: pre-wrap;  /* 긴 내용 줄바꿈 */
-            word-wrap: break-word; /* 단어 단위 줄바꿈 */
-            max-height: 500px; /* 최대 높이 설정 (필요시 조정) */
-            overflow-y: auto;  /* 스크롤 추가 */
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 500px;
+            overflow-y: auto;
         }
         .command-details-list {
             list-style-type: none;
@@ -51,7 +51,7 @@
             background-color: #3E444A;
             border: 1px solid #454d55;
             padding: 0.75rem 1.25rem;
-            margin-bottom: -1px; /* 테두리 겹침 방지 */
+            margin-bottom: -1px;
             color: #f8f9fa;
         }
         .command-details-list li:first-child {
@@ -66,6 +66,8 @@
         .command-details-list strong {
             color: #00beefc0;
             margin-right: 8px;
+            display: inline-block;
+            width: 160px; /* 라벨 너비 고정 */
         }
     </style>
 </head>
@@ -87,13 +89,16 @@
                     <li><strong>Victim Hash:</strong> {{ target_command.get('victim_hash', 'N/A') }}</li>
                     <li><strong>Status:</strong> <span class="command-status-{{ target_command.get('status', 'unknown').lower().replace(' ', '_') }}">{{ target_command.get('status', 'N/A') }}</span></li>
                     <li><strong>Submitted At (UTC):</strong> {{ target_command.get('submitted_at', '').replace('T', ' ')[:19] if target_command.get('submitted_at') else 'N/A' }}</li>
-                    <li><strong>Command String:</strong> <pre style="margin-top: 5px; padding: 8px; max-height: 100px;">{{ target_command.get('command_string', 'N/A') }}</pre></li>
+                    
+                    <li><strong>Command String:</strong> {{ target_command.get('command_string_decrypted', 'Decryption Failed') }}</li>
+                    
+                    <li title="Encrypted original command string"><strong>(Encrypted Original):</strong> <span class="text-muted" style="font-size: 0.8em; word-break: break-all;">{{ target_command.get('command_string', 'N/A') }}</span></li>
                 </ul>
             </div>
         </div>
         {% else %}
         <div class="alert alert-warning" role="alert">
-            <strong>Warning:</strong> Command details not found in the current queue. The command might have been deleted, or this result is for a very old command not in the active queue.
+            <strong>Warning:</strong> Command details not found in the current queue. The command might have been deleted.
         </div>
         {% endif %}
 
@@ -101,7 +106,8 @@
             <div class="card-body">
                 <h2 class="card-title h4"><i class="fas fa-laptop-code mr-2"></i>Output</h2>
                 <div>
-                    {{ result_content | safe }} </div>
+                    {{ result_content | safe }}
+                </div>
             </div>
         </div>
     </div>

